@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>@yield('title','Cosme House')</title>
 
-    {{-- Tailwind --}}
+    {{-- Tailwind CDN --}}
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -42,6 +42,7 @@
     {{-- Icons + Alpine --}}
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
     <style>
         .no-scrollbar::-webkit-scrollbar {
             display: none
@@ -57,7 +58,12 @@
 </head>
 
 <body class="bg-rose-50/40 text-ink">
-    @php use Illuminate\Support\Str; @endphp
+    @php
+    use Illuminate\Support\Str;
+    $headerCats = $headerCats ?? collect();
+    $wishlistCount = (int)($wishlistCount ?? 0);
+    $cartCount = (int)($cartCount ?? 0);
+    @endphp
 
     {{-- Top notice --}}
     <div class="w-full bg-ink text-white text-sm">
@@ -109,7 +115,7 @@
                     </button>
 
                     <div class="invisible opacity-0 group-hover:visible group-hover:opacity-100 transition
-                            absolute right-0 mt-2 w-72 bg-white border border-rose-100 rounded-xl shadow-card py-2">
+                        absolute right-0 mt-2 w-72 bg-white border border-rose-100 rounded-xl shadow-card py-2">
                         <div class="px-4 pb-2 text-sm">
                             <div class="text-ink/60">Xin chào,</div>
                             <div class="font-medium text-ink truncate">{{ $u->name }}</div>
@@ -144,7 +150,7 @@
                         <i class="fa-solid fa-chevron-down text-xs text-ink/60"></i>
                     </button>
                     <div class="invisible opacity-0 group-hover:visible group-hover:opacity-100 transition
-                            absolute right-0 mt-2 w-64 bg-white border border-rose-100 rounded-xl shadow-card py-2">
+                        absolute right-0 mt-2 w-64 bg-white border border-rose-100 rounded-xl shadow-card py-2">
                         <a href="{{ route('login') }}" class="flex items-center gap-2 px-4 py-2 text-sm hover:bg-rose-50">
                             <i class="fa-regular fa-right-to-bracket"></i> Đăng nhập
                         </a>
@@ -158,32 +164,33 @@
                 {{-- Wishlist --}}
                 <a href="{{ route('account.wishlist') }}" class="relative hover:text-brand-600">
                     <i class="fa-regular fa-heart text-lg"></i>
-                    @if(($wishlistCount ?? 0) > 0)
+                    @if($wishlistCount > 0)
                     <span class="absolute -top-2 -right-2 text-[11px] bg-brand-500 text-white rounded-full px-1.5">
                         {{ $wishlistCount }}
                     </span>
                     @endif
                 </a>
 
-                {{-- Cart --}}
-                <a href="{{ route('cart.index') }}" class="relative hover:text-brand-600" @click.prevent="$store.cart.open = true">
+                {{-- Cart (có fallback nếu thiếu route để không nổ 500) --}}
+                <a href="{{ \Illuminate\Support\Facades\Route::has('cart.index') ? route('cart.index') : url('/cart') }}"
+                    class="relative hover:text-brand-600"
+                    @click.prevent="$store.cart.open = true">
                     <i class="fa-solid fa-bag-shopping text-lg"></i>
-                    @if(($cartCount ?? 0) > 0)
+                    @if($cartCount > 0)
                     <span class="absolute -top-2 -right-2 text-[11px] bg-brand-500 text-white rounded-full px-1.5">
                         {{ $cartCount }}
                     </span>
                     @endif
                 </a>
-
             </div>
         </div>
 
-        {{-- NAV: nút Danh mục (flyout) + 8 danh mục cha + Sale --}}
+        {{-- NAV: danh mục + Sale --}}
         <nav class="border-t border-rose-100">
             <div class="max-w-7xl mx-auto px-4 flex items-center gap-6 overflow-x-auto">
                 @include('components.header.category-flyout')
 
-                @foreach(($headerCats ?? collect()) as $cat)
+                @foreach($headerCats as $cat)
                 <a class="py-3 hover:text-brand-600 whitespace-nowrap {{ request()->is('c/'.$cat->slug.'*') ? 'text-brand-600 font-semibold' : '' }}"
                     href="{{ route('category.show', $cat->slug) }}">
                     {{ $cat->name }}
@@ -250,19 +257,23 @@
     </script>
 
     @stack('scripts')
-    <x-cart-drawer />
 
+    {{-- Cart Drawer + Quick View (component của bạn) --}}
+    <x-cart-drawer />
+    <x-quick-view-modal />
+
+    {{-- Alpine stores (gộp 1 chỗ, không ghi đè) --}}
     <script>
         document.addEventListener('alpine:init', () => {
             Alpine.store('cart', {
-                open: false
+                open: false,
+                count: {
+                    {
+                        $cartCount
+                    }
+                },
             });
-        });
-    </script>
-    <x-quick-view-modal />
 
-    <script>
-        document.addEventListener('alpine:init', () => {
             // Quick-View store
             Alpine.store('qv', {
                 open: false,
@@ -278,7 +289,7 @@
                         short: payload.short || '',
                         price_fmt: payload.min ? new Intl.NumberFormat('vi-VN').format(payload.min) + '₫' : null,
                         compare_fmt: payload.compare ? new Intl.NumberFormat('vi-VN').format(payload.compare) + '₫' : null,
-                        sale: sale,
+                        sale,
                         variants: (payload.variants || []).map((v, i) => ({
                             ...v,
                             price_fmt: new Intl.NumberFormat('vi-VN').format(v.price) + '₫',
@@ -288,25 +299,14 @@
                     this.open = true;
                 }
             });
-
-            // Cart UI store (stub cho UX; backend vẫn là session/cart thật)
-            Alpine.store('cart', {
-                open: false,
-                count: {
-                    {
-                        (int)($cartCount ?? 0)
-                    }
-                },
-                // có thể lưu items tạm để drawer phản hồi ngay
-            });
         });
 
         // Lắng nghe event add-to-cart → gọi API của bạn, rồi mở drawer
         document.addEventListener('cart:add', async (e) => {
             const payload = e.detail || {};
             try {
-                // TODO: gọi endpoint thật: await fetch('/cart', {method:'POST', body:...})
-                // Tạm thời: chỉ update UI
+                // TODO: gọi endpoint thật, ví dụ:
+                // await fetch('{{ url('/cart') }}', {method:'POST', headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'}, body: JSON.stringify({variant_id: payload.variant_id, qty: payload.qty || 1})});
                 Alpine.store('cart').count++;
                 Alpine.store('cart').open = true;
                 window.dispatchEvent(new CustomEvent('toast', {
@@ -325,8 +325,8 @@
             }
         });
     </script>
-    @include('shared.toast')
 
+    @include('shared.toast')
 </body>
 
 </html>

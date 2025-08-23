@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Product extends Model
 {
@@ -10,46 +12,51 @@ class Product extends Model
         'brand_id',
         'category_id',
         'name',
+        'short_desc',
+        'long_desc',
         'slug',
-        'image',
-        'description',
+        'thumbnail',
         'is_active',
-        'has_variants'
+        'has_variants',
+        'skin_types',
+        'concerns'
     ];
 
     protected $casts = [
-        'skin_types' => 'array',
-        'concerns'   => 'array',
+        'is_active'    => 'boolean',
+        'has_variants' => 'boolean',
+        'skin_types'   => 'array',
+        'concerns'     => 'array',
     ];
 
-    public function brand()
+    /** ===== Scopes ===== */
+    // Cho phép gọi Product::active()
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', 1);
+    }
+
+    public function scopeOfCategory($query, $categoryId)
+    {
+        return $categoryId ? $query->where('category_id', $categoryId) : $query;
+    }
+
+    public function scopeOfBrand($query, $brandId)
+    {
+        return $brandId ? $query->where('brand_id', $brandId) : $query;
+    }
+
+    /** ===== Quan hệ ===== */
+    public function brand(): BelongsTo
     {
         return $this->belongsTo(Brand::class);
     }
-    public function category()
+    public function category(): BelongsTo
     {
         return $this->belongsTo(Category::class);
     }
-    public function variants()
+    public function variants(): HasMany
     {
         return $this->hasMany(ProductVariant::class);
-    }
-    public function reviews()
-    {
-        return $this->hasMany(Review::class);
-    }
-
-    /** Tổng hợp tồn kho cho toàn bộ biến thể của 1 sản phẩm */
-    public function inventories()
-    {
-        // Product -> ProductVariant -> Inventory
-        return $this->hasManyThrough(
-            Inventory::class,          // model cuối
-            ProductVariant::class,     // model trung gian
-            'product_id',              // FK trên product_variants trỏ về products
-            'product_variant_id',      // FK trên inventories trỏ về product_variants
-            'id',                      // local key của products
-            'id'                       // local key của product_variants
-        );
     }
 }

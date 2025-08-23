@@ -40,8 +40,10 @@ $subtotal = $items->sum(fn($i)=> ($i['price'] ?? 0) * ($i['qty'] ?? 0));
                 <span id="cartSubtotal" class="font-semibold">{{ number_format($subtotal) }}₫</span>
             </div>
             <div class="mt-3 grid grid-cols-2 gap-2">
-                <a href="{{ route('cart.index') }}" class="px-3 py-2 border border-rose-200 rounded-md text-center">Xem giỏ hàng</a>
-                <a href="{{ route('checkout.index') }}" class="px-3 py-2 bg-brand-600 text-white rounded-md text-center">Thanh toán</a>
+                <a href="{{ \Illuminate\Support\Facades\Route::has('cart.index') ? route('cart.index') : url('/cart') }}"
+                    class="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-brand-600 text-white">
+                    Xem giỏ hàng
+                </a> <a href="{{ route('checkout.index') }}" class="px-3 py-2 bg-brand-600 text-white rounded-md text-center">Thanh toán</a>
             </div>
         </div>
     </aside>
