@@ -8,7 +8,6 @@
 @if($errors->any())
 <div class="alert alert-danger mb-3">{{ $errors->first() }}</div>
 @endif
-
 <form method="post" action="{{ route('admin.brands.update',$brand) }}" enctype="multipart/form-data" class="space-y-3">
     @csrf @method('PUT')
     <div class="card p-3">

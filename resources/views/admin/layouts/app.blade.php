@@ -102,7 +102,7 @@
                 @endcan
 
                 {{-- BÁN HÀNG --}}
-                @canany(['manage orders','manage customers'])
+                @canany(['manage orders','manage customers','manage reviews'])
                 <div class="px-3 pt-3 pb-1 text-[11px] uppercase tracking-wider text-slate-400 sidebar-section">Bán hàng</div>
 
                 @can('manage orders')
@@ -116,6 +116,20 @@
                 <a class="nav-item nav-smooth flex items-center px-3 py-2 rounded hover:bg-slate-100 {{ request()->routeIs('admin.customers.*') ? 'bg-slate-100 font-medium' : '' }}"
                     href="{{ route('admin.customers.index') }}">
                     <i class="fa-solid fa-user-group mr-2"></i> <span class="sidebar-label">Khách hàng</span>
+                </a>
+                @endcan
+                @can('manage reviews')
+                <a class="nav-item nav-smooth flex items-center px-3 py-2 rounded hover:bg-slate-100 {{ request()->routeIs('admin.reviews.*') ? 'bg-slate-100 font-medium' : '' }}"
+                    href="{{ route('admin.reviews.index') }}">
+                    <i class="fa-solid fa-star-half-stroke mr-2"></i>
+                    <span class="sidebar-label">Đánh giá</span>
+
+                    {{-- badge số đánh giá chờ duyệt (nếu có) --}}
+                    @if(($pendingReviewsCount ?? 0) > 0)
+                    <span class="ml-auto inline-flex items-center justify-center rounded-full bg-rose-600 text-white text-[11px] px-2 py-0.5">
+                        {{ $pendingReviewsCount }}
+                    </span>
+                    @endif
                 </a>
                 @endcan
                 @endcanany
@@ -147,13 +161,30 @@
                 @endcanany
 
                 {{-- TIẾP THỊ --}}
+                @canany(['manage coupons','manage shipping vouchers'])
+                <div class="px-3 pt-3 pb-1 text-[11px] uppercase tracking-wider text-slate-400 sidebar-section">
+                    Tiếp thị
+                </div>
+
+                {{-- Mã giảm giá --}}
                 @can('manage coupons')
-                <div class="px-3 pt-3 pb-1 text-[11px] uppercase tracking-wider text-slate-400 sidebar-section">Tiếp thị</div>
-                <a class="nav-item nav-smooth flex items-center px-3 py-2 rounded hover:bg-slate-100 {{ request()->routeIs('admin.coupons.*') ? 'bg-slate-100 font-medium' : '' }}"
+                <a class="nav-item nav-smooth flex items-center px-3 py-2 rounded hover:bg-slate-100
+              {{ request()->routeIs('admin.coupons.*') ? 'bg-slate-100 font-medium' : '' }}"
                     href="{{ route('admin.coupons.index') }}">
-                    <i class="fa-solid fa-ticket mr-2"></i> <span class="sidebar-label">Mã giảm giá</span>
+                    <i class="fa-solid fa-ticket mr-2"></i>
+                    <span class="sidebar-label">Mã giảm giá</span>
                 </a>
                 @endcan
+                @can('manage shipping vouchers')
+                <a class="nav-item nav-smooth flex items-center px-3 py-2 rounded hover:bg-slate-100
+              {{ request()->routeIs('admin.shipvouchers.*') ? 'bg-slate-100 font-medium' : '' }}"
+                    href="{{ route('admin.shipvouchers.index') }}">
+                    <i class="fa-solid fa-truck-fast mr-2"></i>
+                    <span class="sidebar-label">Mã vận chuyển</span>
+                </a>
+                @endcan
+                @endcanany
+
 
                 {{-- NỘI DUNG --}}
                 @can('manage banners')
@@ -275,8 +306,8 @@
             }
         })();
     </script>
-
     @stack('scripts')
+
 </body>
 
 </html>

@@ -13,7 +13,6 @@
     <div class="toolbar-title">Quản lý thương hiệu</div>
     <a href="{{ route('admin.brands.create') }}" class="btn btn-primary btn-sm">+ Thêm</a>
 </div>
-
 {{-- Tabs trạng thái --}}
 @php $st = $filters['status'] ?? ''; @endphp
 @php

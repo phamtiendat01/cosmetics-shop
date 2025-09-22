@@ -6,9 +6,14 @@ use Illuminate\Database\Eloquent\Model;
 
 class CouponRedemption extends Model
 {
-    protected $fillable = ['coupon_id', 'user_id', 'order_id', 'code_snapshot', 'discount_amount', 'redeemed_at'];
-
-    protected $casts = ['redeemed_at' => 'datetime'];
+    protected $fillable = [
+        'coupon_id',
+        'code',
+        'user_id',
+        'order_id',
+        'discount_amount',
+        'shipping_discount_amount'
+    ];
 
     public function coupon()
     {
@@ -21,5 +26,9 @@ class CouponRedemption extends Model
     public function order()
     {
         return $this->belongsTo(Order::class);
+    }
+    public function redemptions()
+    {
+        return $this->hasMany(\App\Models\CouponRedemption::class, 'coupon_id');
     }
 }

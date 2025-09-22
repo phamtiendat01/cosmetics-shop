@@ -294,4 +294,4 @@ $to = $categories->total() ? ($from + $categories->count() - 1) : 0;
     });
 </script>
 @endpush
-@endsection
+@endsection 

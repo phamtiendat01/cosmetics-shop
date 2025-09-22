@@ -1,42 +1,46 @@
-@extends('layouts.guest')
-
-@section('title','Đăng nhập | Cosme House')
-@section('heading','Đăng nhập')
-@section('subheading','Chào mừng bạn quay lại 💖')
+@extends('layouts.app')
+@section('title','Đăng nhập')
 
 @section('content')
-<form action="{{ route('login') }}" method="POST" class="space-y-4">
-    @csrf
-    <div>
-        <label class="block text-sm mb-1">Email</label>
-        <input type="email" name="email" value="{{ old('email') }}"
-            class="w-full px-3 py-2 border border-rose-200 rounded-md outline-none focus:ring-2 focus:ring-brand-400"
-            required autocomplete="email" autofocus>
-        @error('email') <p class="text-xs text-rose-600 mt-1">{{ $message }}</p> @enderror
+<div class="max-w-md mx-auto px-4 py-10">
+    <h1 class="text-2xl font-bold mb-6">Đăng nhập</h1>
+
+    @if (session('status'))
+    <div class="mb-4 rounded border border-emerald-200 bg-emerald-50 text-emerald-800 px-3 py-2">
+        {{ session('status') }}
     </div>
+    @endif
 
-    <div>
-        <label class="block text-sm mb-1">Mật khẩu</label>
-        <input type="password" name="password"
-            class="w-full px-3 py-2 border border-rose-200 rounded-md outline-none focus:ring-2 focus:ring-brand-400"
-            required autocomplete="current-password">
-        @error('password') <p class="text-xs text-rose-600 mt-1">{{ $message }}</p> @enderror
-    </div>
+    <form method="POST" action="{{ url('/login') }}" class="space-y-4">
+        @csrf
+        <div>
+            <label class="block text-sm mb-1">Email</label>
+            <input name="email" type="email" value="{{ old('email') }}" required autofocus
+                class="w-full border border-rose-200 rounded px-3 py-2 outline-none focus:ring-2 focus:ring-brand-400">
+            @error('email')<div class="text-sm text-rose-600 mt-1">{{ $message }}</div>@enderror
+        </div>
 
-    <div class="flex items-center justify-between text-sm">
-        <label class="inline-flex items-center gap-2">
-            <input type="checkbox" name="remember"> Ghi nhớ đăng nhập
-        </label>
-        <a class="text-brand-600 hover:underline" href="{{ route('password.request') }}">Quên mật khẩu?</a>
-    </div>
+        <div>
+            <label class="block text-sm mb-1">Mật khẩu</label>
+            <input name="password" type="password" required
+                class="w-full border border-rose-200 rounded px-3 py-2 outline-none focus:ring-2 focus:ring-brand-400">
+            @error('password')<div class="text-sm text-rose-600 mt-1">{{ $message }}</div>@enderror
+        </div>
 
-    <button class="w-full py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-md font-medium">
-        Đăng nhập
-    </button>
-</form>
-@endsection
+        <div class="flex items-center justify-between">
+            <label class="inline-flex items-center gap-2 text-sm">
+                <input type="checkbox" name="remember" value="1" class="rounded border-rose-300">
+                Ghi nhớ đăng nhập
+            </label>
+            <a href="{{ route('password.request') }}" class="text-sm text-brand-600 hover:underline">Quên mật khẩu?</a>
+        </div>
 
-@section('alt-action')
-Chưa có tài khoản?
-<a class="text-brand-600 hover:underline font-medium" href="{{ route('register') }}">Đăng ký</a>
+        <button class="w-full bg-brand-600 hover:bg-brand-700 text-white rounded px-4 py-2">Đăng nhập</button>
+
+        <div class="text-sm text-ink/70">
+            Chưa có tài khoản?
+            <a href="{{ route('register') }}" class="text-brand-600 hover:underline">Đăng ký</a>
+        </div>
+    </form>
+</div>
 @endsection

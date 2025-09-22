@@ -45,10 +45,16 @@ class BannerController extends Controller
     {
         $data = $request->validated();
 
-        $data['image'] = $request->file('image')->store('banners', 'public');
+        // lưu file vào disk public -> trả path 'banners/xxx.jpg'
+        $path = $request->file('image')->store('banners', 'public');
+        // lưu xuống DB dạng URL public: 'storage/banners/xxx.jpg'
+        $data['image'] = Storage::url($path);
+
         if ($request->hasFile('mobile_image')) {
-            $data['mobile_image'] = $request->file('mobile_image')->store('banners', 'public');
+            $m = $request->file('mobile_image')->store('banners', 'public');
+            $data['mobile_image'] = Storage::url($m);
         }
+
         $data['open_in_new_tab'] = (bool)($data['open_in_new_tab'] ?? false);
         $data['sort_order']      = $data['sort_order'] ?? 0;
 
@@ -71,13 +77,21 @@ class BannerController extends Controller
         $data = $request->validated();
 
         if ($request->hasFile('image')) {
-            Storage::disk('public')->delete($banner->image);
-            $data['image'] = $request->file('image')->store('banners', 'public');
+            if ($p = $this->publicPathFromUrl($banner->image)) {
+                Storage::disk('public')->delete($p);   // chỉ xoá khi có path
+            }
+            $path = $request->file('image')->store('banners', 'public');
+            $data['image'] = Storage::url($path);      // lưu URL public: storage/...
         }
+
         if ($request->hasFile('mobile_image')) {
-            if ($banner->mobile_image) Storage::disk('public')->delete($banner->mobile_image);
-            $data['mobile_image'] = $request->file('mobile_image')->store('banners', 'public');
+            if ($p = $this->publicPathFromUrl($banner->mobile_image)) {
+                Storage::disk('public')->delete($p);
+            }
+            $m = $request->file('mobile_image')->store('banners', 'public');
+            $data['mobile_image'] = Storage::url($m);
         }
+
         $data['open_in_new_tab'] = (bool)($data['open_in_new_tab'] ?? false);
         $data['sort_order']      = $data['sort_order'] ?? 0;
 
@@ -88,16 +102,37 @@ class BannerController extends Controller
 
     public function destroy(Banner $banner)
     {
-        Storage::disk('public')->delete([$banner->image, $banner->mobile_image]);
+        $toDelete = array_values(array_filter([
+            $this->publicPathFromUrl($banner->image),
+            $this->publicPathFromUrl($banner->mobile_image),
+        ]));
+
+        if (!empty($toDelete)) {
+            Storage::disk('public')->delete($toDelete);
+        }
+
         $banner->delete();
 
-        return back()->with('ok', 'Đã xoá banner.');
+        // ⬇️ QUAN TRỌNG: về index, không dùng back()
+        return redirect()->route('admin.banners.index')
+            ->with('ok', 'Đã xoá banner.');
     }
+
 
     // Bật/tắt nhanh
     public function toggle(Banner $banner)
     {
         $banner->update(['is_active' => !$banner->is_active]);
         return back()->with('ok', 'Đã cập nhật trạng thái.');
+    }
+
+    /** Chuyển URL 'storage/banners/xxx.jpg' -> 'banners/xxx.jpg' để xóa trong disk public */
+    private function publicPathFromUrl(?string $url): ?string
+    {
+        if (!$url) return null;
+        // 'storage/...', '/storage/...' -> loại phần 'storage/' và dấu '/'
+        $trimmed = ltrim(str_replace(['storage/', '/storage/'], '', $url), '/');
+        // Nếu DB cũ đã lưu sẵn 'banners/xxx.jpg' thì vẫn trả về nguyên xi
+        return $trimmed ?: null;
     }
 }

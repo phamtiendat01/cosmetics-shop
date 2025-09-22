@@ -59,7 +59,8 @@
                 <td>{{ ($banners->currentPage()-1)*$banners->perPage() + $i + 1 }}</td>
                 <td class="col-name">
                     <div class="cell-thumb">
-                        <img class="thumb" src="{{ $b->image ? asset('storage/'.$b->image) : 'https://placehold.co/80x80' }}" alt="">
+                        <img class="thumb"
+                            src="{{ $b->image ? url($b->image) : 'https://placehold.co/80x80' }}" alt="">
                         <div>
                             <div class="font-medium">{{ $b->title }}</div>
                             @if($b->url)

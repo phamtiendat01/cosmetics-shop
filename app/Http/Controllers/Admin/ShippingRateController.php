@@ -11,18 +11,38 @@ class ShippingRateController extends Controller
 {
     public function index(Request $r)
     {
-        $carriers = ShippingCarrier::orderBy('sort_order')->get();
-        $zones    = ShippingZone::orderBy('name')->get();
+        $rates = ShippingRate::query()
+            ->with(['carrier:id,name,code', 'zone:id,name'])
+            ->orderByDesc('id')
+            ->paginate(15)
+            ->withQueryString();
 
-        $rates = ShippingRate::with(['carrier', 'zone'])
-            ->when($r->carrier_id, fn($q, $v) => $q->where('carrier_id', $v))
-            ->when($r->zone_id, fn($q, $v) => $q->where('zone_id', $v))
-            ->orderBy('carrier_id')->orderBy('zone_id')->orderBy('base_fee')
-            ->paginate(20);
+        // 👉 Trả đúng $carrierOptions và $zoneOptions dưới dạng id => label
+        $carrierOptions = ShippingCarrier::orderBy('sort_order')
+            ->get(['id', 'name', 'code'])
+            ->mapWithKeys(fn($c) => [$c->id => $c->name . ' (' . $c->code . ')'])
+            ->all();
 
-        return view('admin.shipping.rates.index', compact('rates', 'carriers', 'zones'));
+        $zoneOptions = ShippingZone::orderBy('name')
+            ->pluck('name', 'id')
+            ->all();
+
+        return view('admin.shipping.rates.index', compact('rates', 'carrierOptions', 'zoneOptions'));
+    }
+    public function create()
+    {
+        $rate = new ShippingRate();
+        $carrierOptions = ShippingCarrier::orderBy('sort_order')->pluck('name', 'id');
+        $zoneOptions    = ShippingZone::orderBy('name')->pluck('name', 'id');
+        return view('admin.shipping.rates.form', compact('rate', 'carrierOptions', 'zoneOptions'));
     }
 
+    public function edit(ShippingRate $rate)
+    {
+        $carrierOptions = ShippingCarrier::orderBy('sort_order')->pluck('name', 'id');
+        $zoneOptions    = ShippingZone::orderBy('name')->pluck('name', 'id');
+        return view('admin.shipping.rates.form', compact('rate', 'carrierOptions', 'zoneOptions'));
+    }
     public function store(StoreRateRequest $req)
     {
         $data = $req->validated();
@@ -31,13 +51,29 @@ class ShippingRateController extends Controller
         return back()->with('ok', 'Đã thêm biểu phí.');
     }
 
-    public function update(StoreRateRequest $req, ShippingRate $rate)
+    public function update(Request $req, ShippingRate $rate)
     {
-        $data = $req->validated();
+        // Trường hợp chỉ toggle trạng thái
+        if ($req->has('enabled') && !$req->has('name')) {
+            $rate->update(['enabled' => $req->boolean('enabled')]);
+            return back()->with('ok', 'Đã cập nhật biểu phí.');
+        }
+
+        // Cập nhật đầy đủ (giữ nguyên validation từ FormRequest)
+        $data = $req->validate((new StoreRateRules)->rules());
         $data['enabled'] = $req->boolean('enabled');
         $rate->update($data);
+
         return back()->with('ok', 'Đã cập nhật biểu phí.');
     }
+    public function toggle(Request $r, \App\Models\ShippingRate $rate)
+    {
+        $rate->enabled = $r->has('enabled') ? $r->boolean('enabled') : !$rate->enabled;
+        $rate->save();
+
+        return back()->with('ok', $rate->enabled ? 'Đã bật biểu phí.' : 'Đã tắt biểu phí.');
+    }
+
 
     public function destroy(ShippingRate $rate)
     {

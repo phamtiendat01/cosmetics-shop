@@ -36,6 +36,14 @@ class ShippingZoneController extends Controller
         $zone->update($data);
         return back()->with('ok', 'Đã cập nhật khu vực.');
     }
+    public function toggle(Request $r, \App\Models\ShippingZone $zone)
+    {
+        $zone->enabled = $r->has('enabled') ? $r->boolean('enabled') : !$zone->enabled;
+        $zone->save();
+
+        return back()->with('ok', $zone->enabled ? 'Đã bật khu vực.' : 'Đã tắt khu vực.');
+    }
+
     public function destroy(ShippingZone $zone)
     {
         $zone->delete();
