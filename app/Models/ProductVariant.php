@@ -23,7 +23,6 @@ class ProductVariant extends Model
         'price'            => 'decimal:2',
         'compare_at_price' => 'decimal:2',
     ];
-
     // Cho phép gọi ProductVariant::active()
     public function scopeActive($query)
     {

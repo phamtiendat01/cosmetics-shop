@@ -76,7 +76,6 @@ $to = $products->total() ? ($from + $products->count() - 1) : 0;
 @if($products->total() > 0)
 <div class="mb-2 text-sm text-slate-600">Hiển thị {{ $from }}–{{ $to }} / {{ $products->total() }} sản phẩm</div>
 @endif
-
 <div class="card table-wrap p-0">
     <table class="table-admin w-full" id="productTable">
         <colgroup>

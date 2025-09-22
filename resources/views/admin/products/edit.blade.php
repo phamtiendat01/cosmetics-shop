@@ -16,7 +16,6 @@
     </ul>
 </div>
 @endif
-
 <form method="post" action="{{ route('admin.products.update', $product) }}" enctype="multipart/form-data" class="space-y-4">
     @csrf @method('PUT')
 

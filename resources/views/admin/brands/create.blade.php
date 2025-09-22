@@ -5,7 +5,6 @@
 @if($errors->any())
 <div class="alert alert-danger mb-3">{{ $errors->first() }}</div>
 @endif
-
 <form method="post" action="{{ route('admin.brands.store') }}" enctype="multipart/form-data" class="space-y-3">
     @csrf
     <div class="card p-3">

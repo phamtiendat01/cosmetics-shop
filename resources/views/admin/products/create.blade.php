@@ -13,7 +13,6 @@
 
 <form method="post" action="{{ route('admin.products.store') }}" enctype="multipart/form-data" class="space-y-4">
     @csrf
-
     <div class="card p-3">
         <div class="grid md:grid-cols-2 gap-4">
             <div>

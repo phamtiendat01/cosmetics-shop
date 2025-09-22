@@ -11,12 +11,12 @@ class BrandSeeder extends Seeder
     public function run(): void
     {
         $names = [
-            'L\'Oréal',
+            "L'Oréal",
             'Maybelline',
             'Innisfree',
             'The Body Shop',
             'La Roche-Posay',
-            'Kiehl\'s',
+            "Kiehl's",
             'Laneige',
             'MAC',
             'Clinique',
@@ -28,16 +28,20 @@ class BrandSeeder extends Seeder
             'Estée Lauder'
         ];
 
-        $i = 0;
+        $i = 1;
         foreach ($names as $name) {
-            Brand::firstOrCreate(
-                ['slug' => Str::slug($name)],
+            // tạo slug an toàn
+            $slug = Str::slug(iconv('UTF-8', 'ASCII//TRANSLIT', $name));
+
+            Brand::updateOrCreate(
+                ['slug' => $slug],
                 [
-                    'name'       => $name,
-                    'website'    => null,
-                    'sort_order' => $i++,
-                    'is_active'  => true,
-                    'logo'       => null, // có thể tự gán link/logo demo sau
+                    'name'        => $name,
+                    'website'     => null,
+                    'sort_order'  => $i++,
+                    'is_active'   => true,
+                    'logo'        => 'https://via.placeholder.com/150?text=' . urlencode($name),
+                    'description' => 'Thương hiệu mỹ phẩm ' . $name,
                 ]
             );
         }

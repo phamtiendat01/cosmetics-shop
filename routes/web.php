@@ -303,7 +303,6 @@ Route::middleware(['auth', 'role:super-admin|admin|staff'])
             ->middleware('permission:manage categories')->name('categories.toggle');
         Route::post('categories/bulk', [AdminCategoryController::class, 'bulk'])
             ->middleware('permission:manage categories')->name('categories.bulk');
-
         // Brands
         Route::resource('brands', AdminBrandController::class)
             ->middleware('permission:manage brands');
