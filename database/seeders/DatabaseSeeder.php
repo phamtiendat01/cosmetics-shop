@@ -21,6 +21,8 @@ class DatabaseSeeder extends Seeder
             SettingSeeder::class,
             SampleOrdersSeeder::class,
             OneOrderSeeder::class,
+            PaymentMethodSeeder::class,
+            WheelSeeder::class,
         ]);
     }
 }

@@ -9,17 +9,22 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::create('products', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('brand_id')->nullable()->constrained()->nullOnDelete();
-            $table->foreignId('category_id')->nullable()->constrained()->nullOnDelete();
-            $table->string('name');
-            $table->string('slug')->unique();
-            $table->string('image')->nullable();
-            $table->text('description')->nullable();
-            $table->boolean('is_active')->default(true);
-            $table->boolean('has_variants')->default(true);
-            $table->timestamps();
-        });
+    $table->id();
+    $table->string('slug')->unique();
+    $table->foreignId('brand_id')->constrained()->cascadeOnDelete();
+    $table->foreignId('category_id')->constrained()->cascadeOnDelete();
+    $table->string('name');
+    $table->string('thumbnail')->nullable();
+    $table->string('short_desc')->nullable();
+    $table->text('description')->nullable();   // ✅ thêm dòng này
+    $table->boolean('is_active')->default(true);
+    $table->boolean('has_variants')->default(false);
+    $table->json('skin_types')->nullable();
+    $table->json('concerns')->nullable();
+    $table->timestamps();
+});
+
+
     }
     public function down(): void
     {

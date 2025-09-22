@@ -15,8 +15,8 @@ class ShopController extends Controller
             ->withMin('variants as min_price', 'price')
             ->withMax('variants as max_price', 'price')
             ->withMin('variants as min_compare_at_price', 'compare_at_price')
-            ->withAvg('reviews as avg_rating', 'rating')
-            ->withCount('reviews as reviews_count');
+            ->withAvg('approvedReviews as avg_rating', 'rating')
+            ->withCount('approvedReviews as reviews_count');
 
         if ($qStr !== '') {
             $q->where(function ($qq) use ($qStr) {
@@ -32,7 +32,7 @@ class ShopController extends Controller
         if ($brand = request('brand_id')) $q->where('brand_id', $brand);
         if ($brandIds = request('brand_ids')) $q->whereIn('brand_id', (array)$brandIds);
         if ($rating = request('rating')) $q->having('avg_rating', '>=', (int)$rating);
-        if (request()->boolean('in_stock')) $q->whereHas('variants.inventory', fn($qq) => $qq->where('stock', '>', 0));
+        if (request()->boolean('in_stock')) $q->whereHas('variants.inventory', fn($qq) => $qq->where('qty_in_stock', '>', 0));
 
         match (request('sort')) {
             'price_asc' => $q->orderBy('min_price'),

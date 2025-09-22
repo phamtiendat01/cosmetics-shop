@@ -115,7 +115,8 @@ $to = $orders->total() ? ($from + $orders->count() - 1) : 0;
             <tr>
                 <td><input type="checkbox" class="rowCheck" value="{{ $o->id }}"></td>
                 <td>
-                    <a class="link font-semibold" href="{{ route('admin.orders.show',$o) }}">#{{ $o->code }}</a>
+                    {{-- ĐỔI DÒNG NÀY --}}
+                    <a class="link font-semibold" href="{{ route('admin.orders.show', ['admin_order' => $o->id]) }}">#{{ $o->code }}</a>
                     <div class="text-xs text-slate-500">{{ $o->items_count }} SP</div>
                 </td>
                 <td>

@@ -9,48 +9,40 @@ return new class extends Migration {
     {
         Schema::create('coupons', function (Blueprint $t) {
             $t->id();
-            $t->string('code', 50)->unique();                 // MÃ (in HOA, duy nhất)
-            $t->string('name')->nullable();                   // tiêu đề dễ đọc
-            $t->text('description')->nullable();
+            $t->string('name');
+            $t->string('code')->nullable()->unique(); // null = auto promotion
+            $t->enum('apply_scope', ['order', 'item', 'shipping'])->default('order');
+            $t->enum('discount_type', ['percent', 'fixed', 'free_shipping'])->default('fixed'); // free_shipping dùng cho scope shipping
 
-            $t->enum('discount_type', ['percent', 'fixed']);   // % hay tiền
-            $t->decimal('discount_value', 12, 2);             // 10 = 10% hoặc 10.000đ
-            $t->decimal('max_discount', 12, 2)->nullable();   // trần giảm với % (tuỳ chọn)
+            $t->unsignedInteger('percent')->nullable();        // khi percent
+            $t->unsignedBigInteger('amount')->nullable();      // khi fixed (VND)
+            $t->unsignedBigInteger('max_discount')->nullable(); // trần giảm (VND)
+            $t->unsignedBigInteger('shipping_cap')->nullable(); // trần giảm ship (VND)
+            $t->unsignedBigInteger('min_subtotal')->nullable(); // điều kiện ngưỡng (VND)
 
-            $t->decimal('min_order_total', 12, 2)->default(0);
+            $t->boolean('exclude_sale_items')->default(false);
 
-            $t->enum('applied_to', ['order', 'category', 'brand', 'product'])->default('order');
-            $t->json('applies_to_ids')->nullable();           // mảng id (category_ids/brand_ids/product_ids)
+            // giới hạn dùng
+            $t->unsignedInteger('usage_limit')->nullable();     // tổng lượt
+            $t->unsignedInteger('per_user_limit')->nullable();  // mỗi user
+            $t->boolean('first_order_only')->default(false);
+            $t->boolean('require_logged_in')->default(true);
 
-            $t->boolean('is_stackable')->default(false);      // có cho dùng kèm mã khác không
-            $t->boolean('first_order_only')->default(false);  // chỉ đơn đầu
-            $t->boolean('is_active')->default(true);
+            // stacking: none / with_shipping / all
+            $t->enum('stacking', ['none', 'with_shipping', 'all'])->default('with_shipping');
 
-            $t->unsignedInteger('usage_limit')->nullable();         // tổng số lần được dùng
-            $t->unsignedInteger('usage_limit_per_user')->nullable(); // số lần mỗi KH
-
+            // thời gian
             $t->timestamp('starts_at')->nullable();
             $t->timestamp('ends_at')->nullable();
 
-            $t->timestamps();
-            $t->index(['is_active', 'starts_at', 'ends_at']);
-        });
+            $t->boolean('is_active')->default(true);
 
-        Schema::create('coupon_redemptions', function (Blueprint $t) {
-            $t->id();
-            $t->foreignId('coupon_id')->constrained()->cascadeOnDelete();
-            $t->foreignId('user_id')->nullable()->constrained()->nullOnDelete();
-            $t->foreignId('order_id')->nullable()->constrained()->nullOnDelete();
-            $t->string('code_snapshot', 50);
-            $t->decimal('discount_amount', 12, 2)->default(0);
-            $t->timestamp('redeemed_at')->useCurrent();
             $t->timestamps();
         });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('coupon_redemptions');
         Schema::dropIfExists('coupons');
     }
 };

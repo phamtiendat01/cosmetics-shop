@@ -2,118 +2,113 @@
 
 namespace App\Models;
 
-use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Coupon extends Model
 {
     protected $fillable = [
-        'code',
         'name',
-        'description',
-        'discount_type',
-        'discount_value',
+        'code',
+        'apply_scope',     // order | item | shipping
+        'discount_type',   // percent | fixed | free_shipping
+        'percent',
+        'amount',
+        'min_subtotal',
         'max_discount',
-        'min_order_total',
-        'applied_to',
-        'applies_to_ids',
-        'is_stackable',
-        'first_order_only',
-        'is_active',
+        'shipping_cap',
         'usage_limit',
-        'usage_limit_per_user',
+        'used_count',
+        'per_user_limit',
+        'allow_sale_items',
         'starts_at',
         'ends_at',
+        'is_active',
     ];
-
     protected $casts = [
-        'applies_to_ids' => 'array',
-        'is_stackable' => 'bool',
-        'first_order_only' => 'bool',
-        'is_active' => 'bool',
         'starts_at' => 'datetime',
-        'ends_at' => 'datetime',
-        'discount_value' => 'float',
-        'max_discount' => 'float',
-        'min_order_total' => 'float',
+        'ends_at'   => 'datetime',
+        // các cast khác nếu có:
+        'is_active'      => 'bool',
+        'min_subtotal'   => 'int',
+        'max_discount'   => 'int',
+        'discount_value' => 'int',
+        'target_brands'     => 'array',
+        'target_categories' => 'array',
+        'target_products'   => 'array',
     ];
 
-    public function redemptions()
+    // ===== Relations (nếu có bảng, tự nhận; không có thì vẫn chạy bình thường) =====
+    public function targets(): HasMany
+    {
+        return $this->hasMany(CouponTarget::class);
+    }
+    public function codes(): HasMany
+    {
+        return $this->hasMany(CouponCode::class);
+    }
+    public function uses(): HasMany
     {
         return $this->hasMany(CouponRedemption::class);
     }
-
-    public function usedCount(): int
+    public function redemptions()
     {
-        return (int) $this->redemptions()->count();
+        return $this->hasMany(\App\Models\CouponRedemption::class);
     }
-
-    public function isInTimeWindow(?Carbon $now = null): bool
+    protected static function booted()
     {
-        $now = $now ?: now();
-        if ($this->starts_at && $now->lt($this->starts_at)) return false;
-        if ($this->ends_at   && $now->gt($this->ends_at))   return false;
-        return true;
-    }
-
-    /** Kiểm tra đủ điều kiện và tính số tiền được giảm.
-     * $cart = [
-     *   'subtotal' => 150000,
-     *   'items' => [ ['product_id'=>1,'brand_id'=>2,'category_id'=>3,'qty'=>1,'line_total'=>150000], ... ]
-     * ]
-     * return ['ok'=>true, 'amount'=>30000] hoặc ['ok'=>false, 'error'=>'...']
-     */
-    public function evaluate(array $cart, ?\App\Models\User $user = null): array
-    {
-        if (!$this->is_active) return ['ok' => false, 'error' => 'Mã đang tạm khoá'];
-        if (!$this->isInTimeWindow()) return ['ok' => false, 'error' => 'Mã chưa hiệu lực hoặc đã hết hạn'];
-
-        // giới hạn lượt dùng tổng
-        if ($this->usage_limit && $this->usedCount() >= $this->usage_limit) {
-            return ['ok' => false, 'error' => 'Mã đã hết lượt sử dụng'];
-        }
-        // giới hạn mỗi người
-        if ($user && $this->usage_limit_per_user) {
-            $uCount = $this->redemptions()->where('user_id', $user->id)->count();
-            if ($uCount >= $this->usage_limit_per_user) {
-                return ['ok' => false, 'error' => 'Bạn đã dùng mã này đủ số lần'];
+        static::saving(function ($m) {
+            if (isset($m->code) && $m->code) {
+                $m->code = strtoupper($m->code);
             }
-        }
-        // đơn đầu tiên
-        if ($this->first_order_only && $user) {
-            $hasOrder = \App\Models\Order::where('user_id', $user->id)->exists();
-            if ($hasOrder) return ['ok' => false, 'error' => 'Mã chỉ áp dụng cho đơn đầu tiên'];
-        }
+        });
+    }
 
-        $subtotal = (float)($cart['subtotal'] ?? 0);
-        if ($subtotal + 1e-6 < (float)$this->min_order_total) {
-            return ['ok' => false, 'error' => 'Chưa đạt giá trị đơn tối thiểu'];
+    // ===== “Bắc cầu” schema cũ -> thuộc tính mới (để không phải sửa DB ngay) =====
+    public function getAmountAttribute($v): int
+    {
+        if (!is_null($v)) return (int)$v;
+        // schema cũ: discount_type=fixed + discount_value
+        if (($this->attributes['discount_type'] ?? null) === 'fixed') {
+            return (int)($this->attributes['discount_value'] ?? 0);
         }
+        return 0;
+    }
 
-        // lọc phạm vi áp dụng
-        $eligibleTotal = $subtotal;
-        if ($this->applied_to !== 'order') {
-            $ids = collect($this->applies_to_ids ?: []);
-            $eligibleTotal = collect($cart['items'] ?? [])->sum(function ($i) use ($ids) {
-                return match ($this->applied_to) {
-                    'brand'    => $ids->contains($i['brand_id'] ?? null)    ? ($i['line_total'] ?? 0) : 0,
-                    'category' => $ids->contains($i['category_id'] ?? null) ? ($i['line_total'] ?? 0) : 0,
-                    'product'  => $ids->contains($i['product_id'] ?? null)  ? ($i['line_total'] ?? 0) : 0,
-                    default    => 0,
-                };
-            });
-            if ($eligibleTotal <= 0) return ['ok' => false, 'error' => 'Giỏ hàng không nằm trong phạm vi mã'];
+    public function getPercentAttribute($v): float
+    {
+        if (!is_null($v)) return (float)$v;
+        // schema cũ: discount_type=percent + discount_value
+        if (($this->attributes['discount_type'] ?? null) === 'percent') {
+            return (float)($this->attributes['discount_value'] ?? 0);
         }
+        return 0.0;
+    }
 
-        // tính tiền giảm
-        $amount = $this->discount_type === 'percent'
-            ? round($eligibleTotal * ($this->discount_value / 100))
-            : min($eligibleTotal, (float)$this->discount_value);
+    public function getMinSubtotalAttribute($v): int
+    {
+        if (!is_null($v)) return (int)$v;
+        // schema cũ
+        return (int)($this->attributes['min_order_total'] ?? 0);
+    }
 
-        if ($this->discount_type === 'percent' && $this->max_discount) {
-            $amount = min($amount, (float)$this->max_discount);
-        }
+    public function getApplyScopeAttribute($v): string
+    {
+        if (!is_null($v)) return (string)$v;
+        // schema cũ: applied_to = order | category | brand | product
+        $applied = $this->attributes['applied_to'] ?? 'order';
+        return $applied === 'order' ? 'order' : 'item';
+    }
 
-        return ['ok' => true, 'amount' => max(0, (float)$amount)];
+    // ===== State helpers =====
+    public function isCurrentlyActive(): bool
+    {
+        if (!(bool)($this->attributes['is_active'] ?? true)) return false;
+        $now = now();
+        $start = $this->starts_at ? \Illuminate\Support\Carbon::parse($this->starts_at) : null;
+        $end   = $this->ends_at   ? \Illuminate\Support\Carbon::parse($this->ends_at)   : null;
+        if ($start && $now->lt($start)) return false;
+        if ($end && $now->gt($end))     return false;
+        return true;
     }
 }

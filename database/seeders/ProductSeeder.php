@@ -10,9 +10,38 @@ class ProductSeeder extends Seeder
 {
     public function run(): void
     {
+        // Seed demo data: brands & categories nếu chưa có
+        $demoBrands = [
+            'la-roche-posay' => "La Roche-Posay",
+            'the-ordinary'   => "The Ordinary",
+            'innisfree'      => "Innisfree",
+        ];
+
+        foreach ($demoBrands as $slug => $name) {
+            Brand::firstOrCreate(
+                ['slug' => $slug],
+                ['name' => $name, 'is_active' => true]
+            );
+        }
+
+        $demoCats = [
+            'sua-rua-mat' => "Sữa rửa mặt",
+            'serum'       => "Serum",
+            'chong-nang'  => "Chống nắng",
+        ];
+
+        foreach ($demoCats as $slug => $name) {
+            Category::firstOrCreate(
+                ['slug' => $slug],
+                ['name' => $name, 'is_active' => true]
+            );
+        }
+
+        // Lấy map sau khi đã đảm bảo có brand/category
         $mapCat = Category::pluck('id', 'slug');   // 'sua-rua-mat' => id
         $mapBrand = Brand::pluck('id', 'slug');    // 'la-roche-posay' => id
 
+        // Danh sách sản phẩm demo
         $items = [
             [
                 'name' => 'Sữa rửa mặt dịu nhẹ',
@@ -46,36 +75,42 @@ class ProductSeeder extends Seeder
         ];
 
         foreach ($items as $it) {
+            // tạo hoặc update sản phẩm
             $product = Product::updateOrCreate(
                 ['slug' => Str::slug($it['name'])],
                 [
-                    'brand_id' => $mapBrand[$it['brand']] ?? null,
+                    'brand_id'    => $mapBrand[$it['brand']] ?? null,
                     'category_id' => $mapCat[$it['cat']] ?? null,
-                    'name' => $it['name'],
-                    'thumbnail' => $it['thumb'],
-                    'short_desc' => 'Sản phẩm mẫu cho trang chủ.',
-                    'is_active' => true,
-                    'has_variants' => true,
-                    'skin_types' => json_encode(['oily', 'dry', 'combination']),
-                    'concerns' => json_encode(['acne', 'hydration'])
+                    'name'        => $it['name'],
+                    'thumbnail'   => $it['thumb'],
+                    'short_desc'  => 'Sản phẩm mẫu cho trang chủ.',
+                    'is_active'   => true,
+                    'has_variants'=> true,
+                    'skin_types'  => json_encode(['oily', 'dry', 'combination']),
+                    'concerns'    => json_encode(['acne', 'hydration']),
                 ]
             );
 
+            // tạo variants + inventory
             foreach ($it['variants'] as $v) {
                 $variant = ProductVariant::updateOrCreate(
-                    ['variant_sku' => $v['sku']],
+                    ['sku' => $v['sku']],
                     [
-                        'product_id' => $product->id,
-                        'name' => $v['name'],
-                        'price' => $v['price'],
+                        'product_id'       => $product->id,
+                        'name'             => $v['name'],
+                        'price'            => $v['price'],
                         'compare_at_price' => null,
-                        'weight_grams' => 0,
-                        'is_active' => true
+                        'weight_grams'     => 0,
+                        'is_active'        => true,
                     ]
                 );
+
                 Inventory::updateOrCreate(
                     ['product_variant_id' => $variant->id],
-                    ['qty_in_stock' => $v['stock'], 'low_stock_threshold' => 3]
+                    [
+                        'qty_in_stock'       => $v['stock'],
+                        'low_stock_threshold'=> 3,
+                    ]
                 );
             }
         }

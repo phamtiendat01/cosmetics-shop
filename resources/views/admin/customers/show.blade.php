@@ -10,7 +10,11 @@
 <div class="grid md:grid-cols-3 gap-3">
     <div class="card p-3">
         <div class="cell-thumb">
-            <img class="thumb" src="{{ $customer->avatar ? asset('storage/'.$customer->avatar) : 'https://placehold.co/60x60?text=U' }}">
+            <img
+                class="thumb"
+                src="{{ $customer->avatar_url }}"
+                alt="{{ $customer->name }}"
+                onerror="this.onerror=null;this.src='https://i.pravatar.cc/120?u={{ urlencode($customer->email ?? $customer->id) }}'">
             <div>
                 <div class="font-semibold">{{ $customer->name }}</div>
                 <div class="text-sm text-slate-600">{{ $customer->email }}</div>

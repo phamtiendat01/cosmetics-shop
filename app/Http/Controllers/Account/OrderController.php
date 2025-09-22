@@ -3,61 +3,102 @@
 namespace App\Http\Controllers\Account;
 
 use App\Http\Controllers\Controller;
+use App\Models\Order;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class OrderController extends Controller
 {
-    // GET /account/orders
     public function index(Request $request)
     {
         $userId = Auth::id();
 
-        $orders = DB::table('orders')
-            ->when($userId, fn($q) => $q->where('user_id', $userId))
-            ->orderByDesc('placed_at')
-            ->select('id', 'code', 'status', 'payment_status', 'payment_method', 'grand_total', 'placed_at')
-            ->limit(50)
-            ->get();
+        // Nhãn hiển thị
+        $statusOptions = [
+            'pending'   => 'Chờ xử lý',
+            'processing' => 'Đang xử lý',
+            'confirmed' => 'Đã xác nhận',
+            'shipping'  => 'Đang giao',
+            'delivered' => 'Đã giao',
+            'completed' => 'Hoàn tất',
+            'cancelled' => 'Đã hủy',
+            'refunded'  => 'Hoàn tiền',
+        ];
+        $payOptions = [
+            'unpaid'             => 'Chưa thanh toán',
+            'paid'               => 'Đã thanh toán',
+            'cod'                => 'COD',
+            'failed'             => 'Thất bại',
+            'refunded'           => 'Hoàn tiền',
+            'partially_refunded' => 'Hoàn một phần',
+        ];
 
-        // tuỳ bạn: trả về view('account.orders.index', compact('orders'))
-        return response()->json(['orders' => $orders]);
-    }
+        $filters = [
+            'q'       => trim((string) $request->get('q', '')),
+            'status'  => $request->get('status'),
+            'payment' => $request->get('payment'),
+            'from'    => $request->get('from'),
+            'to'      => $request->get('to'),
+        ];
 
-    // GET /account/orders/{id}
-    public function show($id)
-    {
-        $order = DB::table('orders')->where('id', $id)->first();
-        if (!$order) return abort(404);
+        $q = Order::query()->select('id', 'code', 'status', 'payment_status', 'grand_total', 'created_at');
 
-        $items = DB::table('order_items')
-            ->where('order_id', $id)
-            ->select('product_name_snapshot', 'variant_name_snapshot', 'unit_price', 'qty', 'line_total')
-            ->get();
-
-        return response()->json(['order' => $order, 'items' => $items]);
-    }
-
-    // POST /account/orders/{id}/cancel
-    public function cancel($id)
-    {
-        $order = DB::table('orders')->where('id', $id)->first();
-        if (!$order) return response()->json(['message' => 'Không tìm thấy đơn'], 404);
-        if (!in_array($order->status, ['pending', 'confirmed', 'processing'])) {
-            return response()->json(['message' => 'Đơn không thể hủy ở trạng thái hiện tại'], 422);
+        // Khớp cột sở hữu đơn hàng theo CSDL của bạn
+        if (Schema::hasColumn('orders', 'user_id')) {
+            $q->where('user_id', $userId);
+        } elseif (Schema::hasColumn('orders', 'customer_id')) {
+            $q->where('customer_id', $userId);
+        } else {
+            $q->whereRaw('1=0'); // không có cột thì trả rỗng an toàn
         }
-        DB::table('orders')->where('id', $id)->update(['status' => 'cancelled', 'updated_at' => now()]);
-        DB::table('order_events')->insert([
-            'order_id' => $id,
-            'type'     => 'status_changed',
-            'old'      => json_encode(['status' => $order->status]),
-            'new'      => json_encode(['status' => 'cancelled']),
-            'meta'     => json_encode(['by' => 'customer']),
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
 
-        return response()->json(['status' => 'ok']);
+        if ($filters['q'] !== '') {
+            $q->where(function ($sub) use ($filters) {
+                $sub->where('code', 'like', '%' . $filters['q'] . '%')
+                    ->orWhere('id', intval(preg_replace('/\D/', '', $filters['q'])) ?: -1);
+            });
+        }
+        if (!empty($filters['status']))  $q->where('status', $filters['status']);
+        if (!empty($filters['payment'])) $q->where('payment_status', $filters['payment']);
+        if (!empty($filters['from']))    $q->whereDate('created_at', '>=', $filters['from']);
+        if (!empty($filters['to']))      $q->whereDate('created_at', '<=', $filters['to']);
+
+        $orders = $q->orderByDesc('created_at')->paginate(12)->withQueryString();
+
+        return view('account.orders.index', compact('orders', 'statusOptions', 'payOptions', 'filters'));
+    }
+
+    public function show(Order $order)
+    {
+        // Chỉ chủ đơn mới được xem
+        $userId = Auth::id();
+        if (Schema::hasColumn('orders', 'user_id') && $order->user_id != $userId) abort(404);
+        if (Schema::hasColumn('orders', 'customer_id') && $order->customer_id != $userId) abort(404);
+
+        $order->load(['items.product:id,slug,name,thumbnail']);
+
+        $statusMap = [
+            'pending'   => 'Chờ xử lý',
+            'processing' => 'Đang xử lý',
+            'confirmed' => 'Đã xác nhận',
+            'shipping'  => 'Đang giao',
+            'delivered' => 'Đã giao',
+            'completed' => 'Hoàn tất',
+            'cancelled' => 'Đã hủy',
+            'refunded'  => 'Hoàn tiền',
+        ];
+        $payMap = [
+            'unpaid'             => 'Chưa thanh toán',
+            'paid'               => 'Đã thanh toán',
+            'cod'                => 'COD',
+            'failed'             => 'Thất bại',
+            'refunded'           => 'Hoàn tiền',
+            'partially_refunded' => 'Hoàn một phần',
+        ];
+
+        // Nếu bạn có cột JSON lưu địa chỉ giao hàng
+        $shipping = is_array($order->shipping_address) ? $order->shipping_address : [];
+        return view('account.orders.show', compact('order', 'statusMap', 'payMap', 'shipping'));
     }
 }
