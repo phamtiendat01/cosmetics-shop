@@ -18,6 +18,10 @@ $q->orWhere('user_id', $viewerId);
 ->latest()
 ->get();
 @endphp
+<<<<<<< HEAD
+=======
+
+>>>>>>> 26951689d1eb166ac6660244f4404972363ff21b
 <div class="space-y-4">
     @forelse($reviews as $rv)
     <div class="p-4 border border-rose-100 rounded-xl bg-white">

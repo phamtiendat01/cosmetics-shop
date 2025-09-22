@@ -78,6 +78,10 @@ class Product extends Model
         return $this->hasMany(ProductVariant::class);
     }
 
+<<<<<<< HEAD
+=======
+    // Tất cả review (không lọc)
+>>>>>>> 26951689d1eb166ac6660244f4404972363ff21b
     public function reviews(): HasMany
     {
         return $this->hasMany(\App\Models\ProductReview::class, 'product_id');

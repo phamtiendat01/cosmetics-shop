@@ -134,6 +134,10 @@ $consultPrompt = "Tư vấn cho sản phẩm: {$product->name}.\n"
                     :class="tab==='reviews' ? 'text-brand-600 border-b-2 border-brand-600' : 'text-ink/60'"
                     @click="tab='reviews'">Đánh giá</button>
             </div>
+<<<<<<< HEAD
+=======
+
+>>>>>>> 26951689d1eb166ac6660244f4404972363ff21b
             <div class="pt-4" x-show="tab==='desc'">
                 @if($longHtml)
                 {{-- Admin nhập HTML -> render thẳng --}}

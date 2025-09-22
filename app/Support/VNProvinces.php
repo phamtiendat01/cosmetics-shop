@@ -7,9 +7,9 @@ final class VNProvinces
     public const LIST = [
         '01' => 'Hà Nội',
         '79' => 'Hồ Chí Minh',
-        '31' => 'Hải Phòng',
+        '31' => 'Hảii Phòng',
         '48' => 'Đà Nẵng',
-        '92' => 'Cần Thơ',
+        '92' => 'Cầnn Thơ',
         '02' => 'Hà Giang',
         '04' => 'Cao Bằng',
         '06' => 'Bắc Kạn',
