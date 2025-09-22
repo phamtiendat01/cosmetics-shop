@@ -72,7 +72,11 @@
                     <td>{{ ($customers->currentPage()-1)*$customers->perPage() + $i + 1 }}</td>
                     <td class="font-medium">
                         <div class="cell-thumb">
-                            <img class="thumb" src="{{ $u->avatar ? asset('storage/'.$u->avatar) : 'https://placehold.co/60x60?text=U' }}">
+                            <img
+                                class="thumb"
+                                src="{{ $u->avatar_url }}"
+                                alt="{{ $u->name }}"
+                                onerror="this.onerror=null;this.src='https://i.pravatar.cc/120?u={{ urlencode($u->email ?? $u->id) }}'">
                             <div>
                                 <div>{{ $u->name }}</div>
                                 @if($u->email_verified_at)
@@ -146,7 +150,6 @@
 
 @push('scripts')
 <script>
-    // date
     flatpickr("#dateFrom", {
         dateFormat: "Y-m-d"
     });
@@ -154,7 +157,6 @@
         dateFormat: "Y-m-d"
     });
 
-    // live search
     const kw = document.getElementById('keywordInput');
     const rows = Array.from(document.querySelectorAll('.cust-row'));
     let timer;
@@ -162,8 +164,7 @@
     function doFilter() {
         const q = (kw.value || '').trim().toLowerCase();
         rows.forEach(tr => {
-            const hit = !q || tr.dataset.name.includes(q);
-            tr.style.display = hit ? '' : 'none';
+            tr.style.display = (!q || tr.dataset.name.includes(q)) ? '' : 'none';
         });
     }
     kw.addEventListener('input', () => {
@@ -175,7 +176,6 @@
     });
     doFilter();
 
-    // reset
     document.getElementById('resetBtn').addEventListener('click', () => {
         document.getElementById('filterForm').reset();
         kw.value = '';
@@ -183,13 +183,11 @@
         document.getElementById('filterForm').submit();
     });
 
-    // check all
     const chkAll = document.getElementById('chkAll');
     chkAll.addEventListener('change', () => {
         document.querySelectorAll('input[name="ids[]"]').forEach(c => c.checked = chkAll.checked);
     });
 
-    // confirm delete
     const modal = document.getElementById('confirmModal');
     const form = document.getElementById('confirmForm');
     document.querySelectorAll('[data-confirm-delete]').forEach(btn => {
@@ -199,7 +197,7 @@
         });
     });
     document.querySelectorAll('[data-close-modal]').forEach(b => b.addEventListener('click', () => modal.classList.add('hidden')));
-    modal.addEventListener('click', (e) => {
+    modal.addEventListener('click', e => {
         if (e.target === modal) modal.classList.add('hidden');
     });
 </script>

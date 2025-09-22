@@ -58,7 +58,7 @@ class RoleController extends Controller
             $role->save();
         }
 
-        // Cập nhật quyền
+       
         $role->syncPermissions($data['permissions'] ?? []);
         app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
 

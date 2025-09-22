@@ -16,7 +16,6 @@
     </div>
 </div>
 
-{{-- Tabs trạng thái --}}
 @php $st = $filters['status'] ?? ''; @endphp
 @php
 $tab = function($key,$text,$cnt) use($st){
@@ -34,7 +33,6 @@ return "<a class=\"btn btn-sm $active\" href=\"$url\">$text ($cnt)</a>";
     {!! $tab('novariant', 'Không biến thể',$counts['novariant'] ?? 0) !!}
 </div>
 
-{{-- Filters --}}
 <div class="card p-3 mb-3">
     <form id="filterForm" method="get" class="grid md:grid-cols-5 gap-2 items-center">
         <input name="keyword" value="{{ $filters['keyword'] ?? '' }}" class="form-control search" placeholder="Tìm nhanh theo sản phẩm…">
@@ -82,15 +80,15 @@ $to = $products->total() ? ($from + $products->count() - 1) : 0;
 <div class="card table-wrap p-0">
     <table class="table-admin w-full" id="productTable">
         <colgroup>
-            <col style="width:80px"> {{-- ID --}}
-            <col style="width:80px"> {{-- Ảnh --}}
-            <col style="width:400px"> {{-- Sản phẩm --}}
-            <col style="width:180px"> {{-- Danh mục --}}
-            <col style="width:140px"> {{-- Thương hiệu --}}
-            <col style="width:88px"> {{-- Kho --}}
-            <col style="width:300px"> {{-- Giá --}}
-            <col style="width:140px"> {{-- Ngày tạo --}}
-            <col> {{-- Thao tác (auto, icon-only) --}}
+            <col style="width:80px">
+            <col style="width:80px">
+            <col style="width:400px">
+            <col style="width:180px">
+            <col style="width:140px">
+            <col style="width:88px">
+            <col style="width:300px">
+            <col style="width:140px">
+            <col>
         </colgroup>
 
         <thead>
@@ -108,12 +106,17 @@ $to = $products->total() ? ($from + $products->count() - 1) : 0;
         </thead>
         <tbody>
             @forelse($products as $p)
+            @php
+            // fallback cho dữ liệu cũ còn trường image
+            $thumbPath = $p->thumbnail ?: $p->image;
+            $thumbUrl = $thumbPath ? asset('storage/'.$thumbPath) : 'https://placehold.co/64x64?text=IMG';
+            $thumbModal= $thumbPath ? asset('storage/'.$thumbPath) : 'https://placehold.co/80x80?text=IMG';
+            @endphp
             <tr>
                 <td class="text-right pr-3">{{ $p->id }}</td>
 
                 <td>
-                    <img src="{{ $p->image ? asset('storage/'.$p->image) : 'https://placehold.co/64x64?text=IMG' }}"
-                        alt="thumb" class="w-12 h-12 rounded object-cover">
+                    <img src="{{ $thumbUrl }}" alt="thumb" class="w-12 h-12 rounded object-cover">
                 </td>
 
                 <td>
@@ -127,7 +130,7 @@ $to = $products->total() ? ($from + $products->count() - 1) : 0;
                 <td class="truncate">{{ $p->category?->name ?? '-' }}</td>
                 <td class="truncate">{{ $p->brand?->name ?? '-' }}</td>
 
-                <td class="text-right pr-3">{{ (int)($p->stock ?? 0) }}</td>
+                <td class="text-right pr-3"> {{ number_format($p->stock ?? 0) }}</td>
 
                 <td>
                     @if($p->min_price && $p->max_price && $p->min_price != $p->max_price)
@@ -147,7 +150,7 @@ $to = $products->total() ? ($from + $products->count() - 1) : 0;
                         title="Xoá"
                         data-url="{{ route('admin.products.destroy',$p) }}"
                         data-name="{{ $p->name }}"
-                        data-thumb="{{ $p->image ? asset('storage/'.$p->image) : 'https://placehold.co/80x80?text=IMG' }}">
+                        data-thumb="{{ $thumbModal }}">
                         <i class="fa-solid fa-trash text-[12px]"></i>
                     </button>
                 </td>
@@ -201,7 +204,7 @@ $to = $products->total() ? ($from + $products->count() - 1) : 0;
         create: false
     });
 
-    // Modal xoá (icon-only)
+    // Modal xoá
     const modal = document.getElementById('deleteModal');
     const delName = document.getElementById('delName');
     const delThumb = document.getElementById('delThumb');
@@ -229,6 +232,14 @@ $to = $products->total() ? ($from + $products->count() - 1) : 0;
     });
     document.addEventListener('keydown', e => {
         if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeModal();
+    });
+
+    // Tự ẩn alert
+    document.querySelectorAll('[data-auto-dismiss]').forEach(el => {
+        setTimeout(() => {
+            el.classList.add('alert--hide');
+            setTimeout(() => el.remove(), 350)
+        }, +el.dataset.autoDismiss || 3000)
     });
 </script>
 @endpush

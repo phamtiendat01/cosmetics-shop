@@ -2,183 +2,112 @@
 @section('title','Đơn vị vận chuyển')
 
 @section('content')
+@if(session('ok')) <div class="alert alert-success mb-3" data-auto-dismiss="3000">{{ session('ok') }}</div> @endif
+@if($errors->any()) <div class="alert alert-danger mb-3">{{ $errors->first() }}</div> @endif
+
+{{-- Mini tabs (giữ nguyên logic của anh) --}}
 @include('admin.shipping._nav')
 
-@if(session('ok'))
-<div class="alert alert-success mb-4" data-auto-dismiss="2200">{{ session('ok') }}</div>
-@endif
-@if($errors->any())
-<div class="mb-3 rounded border border-red-200 bg-red-50 text-red-700 p-3">
-    <ul class="list-disc pl-5 text-sm">@foreach($errors->all() as $e)<li>{{ $e }}</li>@endforeach</ul>
-</div>
-@endif
-
-<div class="flex items-center justify-between mb-4">
-    <h1 class="text-lg font-semibold">Đơn vị vận chuyển</h1>
-    <div class="flex items-center gap-2">
-        <form class="hidden md:block">
-            <input name="search" value="{{ request('search') }}" placeholder="Tìm tên / mã"
-                class="rounded-lg border-slate-300 w-64" />
-        </form>
-        <button data-modal-target="carrierCreateModal" data-modal-toggle="carrierCreateModal"
-            class="px-3 py-2 rounded-lg bg-rose-600 text-white hover:bg-rose-700">
-            <i class="fa-solid fa-plus mr-2"></i> Thêm đơn vị
-        </button>
+<div class="toolbar mb-2">
+    <div class="toolbar-title">Đơn vị vận chuyển</div>
+    <div class="toolbar-actions">
+        @if (Route::has('admin.shipping.carriers.create'))
+        <a href="{{ route('admin.shipping.carriers.create') }}" class="btn btn-primary btn-sm">
+            <i class="fa-solid fa-plus"></i> Thêm đơn vị
+        </a>
+        @endif
     </div>
 </div>
 
-@if($q->count())
-<div class="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
-    @foreach($q as $c)
-    <div class="rounded-xl border border-slate-200 bg-white p-4 flex gap-3 items-center">
-        <img src="{{ $c->logo ?: 'https://placehold.co/120x48?text=LOGO' }}" class="w-28 h-12 object-contain bg-white rounded">
-        <div class="flex-1">
-            <div class="flex items-center gap-2">
-                <div class="font-medium">{{ $c->name }}</div>
-                <span class="text-xs text-slate-500">({{ $c->code }})</span>
-                @if($c->enabled)
-                <span class="text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">Bật</span>
-                @else
-                <span class="text-[11px] px-2 py-0.5 rounded-full bg-slate-50 text-slate-600 border border-slate-200">Tắt</span>
-                @endif
-            </div>
-            <div class="text-xs text-slate-500 mt-1">COD: {{ $c->supports_cod ? 'Có' : 'Không' }}</div>
+<div class="card p-3 mb-3">
+    <form method="get" class="grid md:grid-cols-5 gap-2 items-center">
+        <input name="keyword" value="{{ request('keyword','') }}" class="form-control" placeholder="Tên / mã…">
+        <select name="enabled" class="form-control">
+            <option value="">Trạng thái</option>
+            <option value="1" @selected(request('enabled')==='1' )>Đang bật</option>
+            <option value="0" @selected(request('enabled')==='0' )>Đang tắt</option>
+        </select>
+        <div class="md:col-span-3 flex items-center gap-2">
+            <button class="btn btn-soft btn-sm"><i class="fa-solid fa-filter"></i> Lọc</button>
+            <a href="{{ route('admin.shipping.carriers.index') }}" class="btn btn-outline btn-sm">Reset</a>
         </div>
-
-        <div class="flex items-center gap-2">
-            {{-- Toggle Bật/Tắt (submit nhanh) --}}
-            <form method="POST" action="{{ route('admin.shipping.carriers.update',$c) }}">
-                @csrf @method('PUT')
-                <input type="hidden" name="name" value="{{ $c->name }}">
-                <input type="hidden" name="code" value="{{ $c->code }}">
-                <input type="hidden" name="logo" value="{{ $c->logo }}">
-                <input type="hidden" name="supports_cod" value="{{ $c->supports_cod?1:0 }}">
-                <input type="hidden" name="sort_order" value="{{ $c->sort_order }}">
-                <input type="hidden" name="enabled" value="{{ $c->enabled?0:1 }}">
-                <button class="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-xs" title="Bật/Tắt">Bật/Tắt</button>
-            </form>
-
-            {{-- Sửa (modal) --}}
-            <button
-                class="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-xs"
-                data-modal-target="carrierEditModal" data-modal-toggle="carrierEditModal"
-                data-id="{{ $c->id }}"
-                data-name="{{ $c->name }}"
-                data-code="{{ $c->code }}"
-                data-logo="{{ $c->logo }}"
-                data-cod="{{ $c->supports_cod ? 1 : 0 }}"
-                data-enabled="{{ $c->enabled ? 1 : 0 }}"
-                data-sort="{{ $c->sort_order }}">Sửa</button>
-
-            {{-- Xóa --}}
-            <form method="POST" action="{{ route('admin.shipping.carriers.destroy',$c) }}" onsubmit="return confirm('Xóa đơn vị vận chuyển này?')">
-                @csrf @method('DELETE')
-                <button class="px-2 py-1 rounded bg-red-50 hover:bg-red-100 text-red-600 text-xs">Xóa</button>
-            </form>
-        </div>
-    </div>
-    @endforeach
+    </form>
 </div>
 
-<div class="mt-4">{{ $q->withQueryString()->links() }}</div>
-@else
-<div class="rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center text-slate-500">
-    Chưa có đơn vị nào. Bấm <button data-modal-target="carrierCreateModal" data-modal-toggle="carrierCreateModal" class="text-rose-600 hover:underline">Thêm đơn vị</button>.
-</div>
+@php $total = method_exists($carriers,'total') ? $carriers->total() : (is_countable($carriers ?? []) ? count($carriers) : 0); @endphp
+
+@if($total>0)
+<div class="mb-2 text-sm text-slate-600">Có {{ $total }} đơn vị</div>
 @endif
 
-{{-- Modal: Tạo --}}
-<div id="carrierCreateModal" tabindex="-1" aria-hidden="true" class="hidden fixed inset-0 z-50 overflow-y-auto">
-    <div class="flex min-h-full items-center justify-center p-4">
-        <div class="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white shadow-lg">
-            <div class="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
-                <div class="font-semibold">Thêm đơn vị vận chuyển</div>
-                <button data-modal-hide="carrierCreateModal"><i class="fa-solid fa-xmark"></i></button>
-            </div>
-            <form method="POST" action="{{ route('admin.shipping.carriers.store') }}" class="p-5 grid md:grid-cols-2 gap-4">
-                @csrf
-                <div>
-                    <label class="text-sm font-medium">Tên</label>
-                    <input name="name" class="w-full rounded border-slate-300" required>
-                </div>
-                <div>
-                    <label class="text-sm font-medium">Mã (code)</label>
-                    <input name="code" class="w-full rounded border-slate-300" required>
-                </div>
-                <div class="md:col-span-2">
-                    <label class="text-sm font-medium">Logo (URL)</label>
-                    <input name="logo" class="w-full rounded border-slate-300">
-                </div>
-                <div class="md:col-span-2 flex items-center gap-6">
-                    <label class="inline-flex items-center gap-2"><input type="checkbox" name="supports_cod" value="1" checked> Hỗ trợ COD</label>
-                    <label class="inline-flex items-center gap-2"><input type="checkbox" name="enabled" value="1" checked> Bật</label>
-                    <div class="ml-auto">
-                        <label class="text-sm mr-2">Thứ tự</label>
-                        <input type="number" name="sort_order" min="0" value="0" class="w-24 rounded border-slate-300">
+<div class="card table-wrap p-0">
+    <table class="table-admin w-full">
+        <colgroup>
+            <col style="width:70px">
+            <col>
+            <col style="width:140px">
+            <col style="width:120px">
+            <col style="width:120px">
+            <col style="width:180px">
+        </colgroup>
+        <thead>
+            <tr>
+                <th></th>
+                <th>Tên đơn vị</th>
+                <th>Mã</th>
+                <th>COD</th>
+                <th>Trạng thái</th>
+                <th class="text-right">Thao tác</th>
+            </tr>
+        </thead>
+        <tbody>
+            @forelse($carriers as $c)
+            <tr>
+                <td>
+                    @if($c->logo_url)
+                    <img class="w-8 h-8 rounded object-cover" src="{{ $c->logo_url }}" alt="">
+                    @else
+                    <span class="inline-flex w-8 h-8 items-center justify-center rounded bg-slate-100 text-slate-500">
+                        <i class="fa-solid fa-truck"></i>
+                    </span>
+                    @endif
+
+                </td>
+                <td class="font-medium">{{ $c->name }}</td>
+                <td><code class="text-xs">{{ $c->code }}</code></td>
+                <td>{!! $c->supports_cod ? '<span class="badge badge-green">Có</span>' : '<span class="badge badge-amber">Không</span>' !!}</td>
+                <td>{!! $c->enabled ? '<span class="badge badge-green">Đang bật</span>' : '<span class="badge badge-amber">Đang tắt</span>' !!}</td>
+                <td class="text-right">
+                    <div class="actions">
+                        <form class="inline" method="post" action="{{ route('admin.shipping.carriers.toggle', $c) }}">
+                            @csrf @method('PATCH')
+                            <input type="hidden" name="enabled" value="{{ $c->enabled ? 0 : 1 }}">
+                            <button class="btn btn-soft btn-sm" title="Bật/Tắt">
+                                <i class="fa-solid fa-toggle-{{ $c->enabled ? 'on' : 'off' }}"></i>
+                            </button>
+                        </form>
+                        @if (Route::has('admin.shipping.carriers.edit'))
+                        <a href="{{ route('admin.shipping.carriers.edit',$c) }}" class="btn btn-outline btn-sm">Sửa</a>
+                        @endif
+
+                        <form class="inline" method="post" action="{{ route('admin.shipping.carriers.destroy',$c) }}"
+                            onsubmit="return confirm('Xoá đơn vị này?')">
+                            @csrf @method('DELETE')
+                            <button class="btn btn-danger btn-sm">Xoá</button>
+                        </form>
                     </div>
-                </div>
-                <div class="md:col-span-2 flex justify-end pt-2">
-                    <button class="px-4 py-2 rounded-lg bg-rose-600 text-white hover:bg-rose-700"><i class="fa-solid fa-floppy-disk mr-2"></i>Lưu</button>
-                </div>
-            </form>
-        </div>
-    </div>
+                </td>
+            </tr>
+            @empty
+            <tr>
+                <td colspan="6" class="py-6 text-center text-slate-500">Chưa có đơn vị.</td>
+            </tr>
+            @endforelse
+        </tbody>
+    </table>
 </div>
 
-{{-- Modal: Sửa --}}
-<div id="carrierEditModal" tabindex="-1" aria-hidden="true" class="hidden fixed inset-0 z-50 overflow-y-auto">
-    <div class="flex min-h-full items-center justify-center p-4">
-        <div class="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white shadow-lg">
-            <div class="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
-                <div class="font-semibold">Sửa đơn vị vận chuyển</div>
-                <button data-modal-hide="carrierEditModal"><i class="fa-solid fa-xmark"></i></button>
-            </div>
-            <form id="carrierEditForm" method="POST" class="p-5 grid md:grid-cols-2 gap-4">
-                @csrf @method('PUT')
-                <div>
-                    <label class="text-sm font-medium">Tên</label>
-                    <input name="name" class="w-full rounded border-slate-300" required>
-                </div>
-                <div>
-                    <label class="text-sm font-medium">Mã (code)</label>
-                    <input name="code" class="w-full rounded border-slate-300" required>
-                </div>
-                <div class="md:col-span-2">
-                    <label class="text-sm font-medium">Logo (URL)</label>
-                    <input name="logo" class="w-full rounded border-slate-300">
-                </div>
-                <div class="md:col-span-2 flex items-center gap-6">
-                    <label class="inline-flex items-center gap-2"><input type="checkbox" name="supports_cod" value="1"> Hỗ trợ COD</label>
-                    <label class="inline-flex items-center gap-2"><input type="checkbox" name="enabled" value="1"> Bật</label>
-                    <div class="ml-auto">
-                        <label class="text-sm mr-2">Thứ tự</label>
-                        <input type="number" name="sort_order" min="0" class="w-24 rounded border-slate-300">
-                    </div>
-                </div>
-                <div class="md:col-span-2 flex justify-end pt-2">
-                    <button class="px-4 py-2 rounded-lg bg-rose-600 text-white hover:bg-rose-700"><i class="fa-solid fa-floppy-disk mr-2"></i>Lưu</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-@push('scripts')
-<script>
-    // Điền dữ liệu vào modal edit
-    document.querySelectorAll('[data-modal-target="carrierEditModal"]').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const id = btn.dataset.id;
-            const form = document.getElementById('carrierEditForm');
-            form.action = "{{ route('admin.shipping.carriers.update', ':id') }}".replace(':id', id);
-            form.querySelector('[name="name"]').value = btn.dataset.name || '';
-            form.querySelector('[name="code"]').value = btn.dataset.code || '';
-            form.querySelector('[name="logo"]').value = btn.dataset.logo || '';
-            form.querySelector('[name="supports_cod"]').checked = btn.dataset.cod === '1';
-            form.querySelector('[name="enabled"]').checked = btn.dataset.enabled === '1';
-            form.querySelector('[name="sort_order"]').value = btn.dataset.sort || 0;
-        });
-    });
-</script>
-@endpush
+@if(method_exists($carriers,'links'))
+<div class="pagination mt-3">{{ $carriers->onEachSide(1)->links('pagination::tailwind') }}</div>
+@endif
 @endsection

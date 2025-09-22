@@ -9,134 +9,113 @@ use App\Models\Category;
 use App\Models\Brand;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
 class CouponController extends Controller
 {
-    /**
-     * Danh sách mã giảm giá + lọc cơ bản.
-     */
+    /** Danh sách + lọc cơ bản (ADMIN) */
     public function index(Request $r)
     {
-        $q = Coupon::query()
-            ->when($r->keyword, function ($qq) use ($r) {
-                $kw = trim($r->keyword);
-                $qq->where(function ($x) use ($kw) {
-                    $x->where('code', 'like', "%{$kw}%")
-                        ->orWhere('name', 'like', "%{$kw}%");
-                });
-            });
+        $now = now();
 
-        // status: active|inactive|ongoing|expired
-        if ($r->filled('status')) {
-            $now = now();
-            switch ($r->status) {
-                case 'active':
-                    $q->where('is_active', 1);
-                    break;
-                case 'inactive':
-                    $q->where('is_active', 0);
-                    break;
-                case 'ongoing':
-                    $q->where('is_active', 1)
-                        ->where(function ($w) use ($now) {
-                            $w->whereNull('starts_at')->orWhere('starts_at', '<=', $now);
-                        })
-                        ->where(function ($w) use ($now) {
-                            $w->whereNull('ends_at')->orWhere('ends_at', '>=', $now);
-                        });
-                    break;
-                case 'expired':
-                    $q->whereNotNull('ends_at')->where('ends_at', '<', $now);
-                    break;
-            }
+        // --- Nhận filters từ query ---
+        $filters = [
+            'keyword' => trim((string) $r->input('keyword', '')),
+            'status'  => trim((string) $r->input('status', '')),   // active|inactive|ongoing|expired|''
+            'type'    => trim((string) $r->input('type', '')),     // percent|fixed|''
+        ];
+
+        // --- Builder danh sách ---
+        $q = Coupon::query();
+
+        if ($filters['keyword'] !== '') {
+            $kw = $filters['keyword'];
+            $q->where(function ($qq) use ($kw) {
+                $qq->where('code', 'like', "%{$kw}%")
+                    ->orWhere('name', 'like', "%{$kw}%");
+            });
         }
 
-        $coupons = $q->orderByDesc('id')->paginate(12)->withQueryString();
+        if ($filters['type'] !== '') {
+            $q->where('discount_type', $filters['type']);
+        }
 
-        return view('admin.coupons.index', [
-            'coupons' => $coupons,
-            'filters' => $r->only('keyword', 'status'),
-        ]);
+        switch ($filters['status']) {
+            case 'active':
+                $q->where('is_active', true);
+                break;
+            case 'inactive':
+                $q->where('is_active', false);
+                break;
+            case 'ongoing':
+                $q->where(function ($qq) use ($now) {
+                    $qq->whereNull('starts_at')->orWhere('starts_at', '<=', $now);
+                })->where(function ($qq) use ($now) {
+                    $qq->whereNull('ends_at')->orWhere('ends_at', '>=', $now);
+                });
+                break;
+            case 'expired':
+                $q->whereNotNull('ends_at')->where('ends_at', '<', $now);
+                break;
+        }
+
+        // --- Đếm số lượt dùng (coupon_usages) ---
+        $usageSub = DB::table('coupon_usages')
+            ->select('coupon_id', DB::raw('COUNT(*) as redemptions_count'))
+            ->groupBy('coupon_id');
+
+        $coupons = $q->leftJoinSub($usageSub, 'u', function ($join) {
+            $join->on('u.coupon_id', '=', 'coupons.id');
+        })
+            ->select('coupons.*', DB::raw('COALESCE(u.redemptions_count,0) as redemptions_count'))
+            ->orderByDesc('coupons.created_at')
+            ->paginate(20)
+            ->withQueryString();
+
+        // --- Counts cho tabs ---
+        $countQ = Coupon::query();
+        $counts = [
+            'all'      => (clone $countQ)->count(),
+            'active'   => (clone $countQ)->where('is_active', true)->count(),
+            'inactive' => (clone $countQ)->where('is_active', false)->count(),
+            'ongoing'  => (clone $countQ)
+                ->where(function ($qq) use ($now) {
+                    $qq->whereNull('starts_at')->orWhere('starts_at', '<=', $now);
+                })
+                ->where(function ($qq) use ($now) {
+                    $qq->whereNull('ends_at')->orWhere('ends_at', '>=', $now);
+                })
+                ->count(),
+            'expired'  => (clone $countQ)->whereNotNull('ends_at')->where('ends_at', '<', $now)->count(),
+        ];
+
+        // 👉 Quan trọng: trả về view Admin
+        return view('admin.coupons.index', compact('coupons', 'counts', 'filters'));
     }
 
-    /**
-     * Form tạo.
-     */
+    /** Form tạo */
     public function create()
     {
-        // mảng id preselect cho TomSelect (trống khi tạo mới)
         $preselected = [];
         return view('admin.coupons.create', compact('preselected'));
     }
 
-    /**
-     * Lưu mới.
-     */
+    /** Lưu mới */
     public function store(Request $r)
     {
-        $rules = [
-            'code'               => ['required', 'string', 'max:64', 'unique:coupons,code'],
-            'name'               => ['nullable', 'string', 'max:255'],
-            'description'        => ['nullable', 'string'],
-            'is_active'          => ['required', 'boolean'],
+        $data = $this->validateForm($r);
+        $payload = $this->mapToPayload($data);
 
-            // form dùng: type (percent|fixed), value
-            'type'               => ['required', Rule::in(['percent', 'fixed'])],
-            'value'              => ['required', 'numeric', 'min:0'],
-            'max_discount'       => ['nullable', 'numeric', 'min:0'],
-            'min_order_value'    => ['nullable', 'numeric', 'min:0'],
-
-            'usage_limit'        => ['nullable', 'integer', 'min:0'],
-            'per_customer_limit' => ['nullable', 'integer', 'min:0'],
-
-            'applies_to'         => ['required', Rule::in(['order', 'category', 'brand', 'product'])],
-            'applies_to_ids'     => ['array'],
-            'applies_to_ids.*'   => ['string'],
-
-            'start_at'           => ['nullable', 'date'],
-            'end_at'             => ['nullable', 'date', 'after_or_equal:start_at'],
-        ];
-        if ($r->input('type') === 'percent') {
-            $rules['value'][] = 'max:100';
-        }
-
-        $data = $r->validate($rules);
-
-        $payload = [
-            'code'                   => $data['code'],
-            'name'                   => $data['name'] ?? null,
-            'description'            => $data['description'] ?? null,
-            'is_active'              => (bool) $data['is_active'],
-
-            'discount_type'          => $data['type'],
-            'discount_value'         => (float) $data['value'],
-            'max_discount'           => $data['max_discount'] ?? null,
-            'min_order_total'        => $data['min_order_value'] ?? 0,
-
-            'usage_limit'            => $data['usage_limit'] ?? null,
-            'usage_limit_per_user'   => $data['per_customer_limit'] ?? null,
-
-            'applied_to'             => $data['applies_to'],
-            'applies_to_ids'         => array_values(array_map('strval', $data['applies_to_ids'] ?? [])),
-
-            'starts_at'              => !empty($data['start_at']) ? Carbon::parse($data['start_at']) : null,
-            'ends_at'                => !empty($data['end_at'])   ? Carbon::parse($data['end_at'])   : null,
-        ];
-
-        // Nếu áp dụng toàn đơn, không cần lưu applies_to_ids
         if ($payload['applied_to'] === 'order') {
             $payload['applies_to_ids'] = [];
         }
 
         Coupon::create($payload);
-
         return redirect()->route('admin.coupons.index')->with('ok', 'Tạo mã giảm giá thành công!');
     }
 
-    /**
-     * Form sửa.
-     */
+    /** Form sửa */
     public function edit(Coupon $coupon)
     {
         $preselected = collect(old('applies_to_ids', $coupon->applies_to_ids ?? []))
@@ -145,83 +124,28 @@ class CouponController extends Controller
         return view('admin.coupons.edit', compact('coupon', 'preselected'));
     }
 
-    /**
-     * Cập nhật.
-     */
+    /** Cập nhật */
     public function update(Request $r, Coupon $coupon)
     {
-        $rules = [
-            'code'               => ['required', 'string', 'max:64', Rule::unique('coupons', 'code')->ignore($coupon->id)],
-            'name'               => ['nullable', 'string', 'max:255'],
-            'description'        => ['nullable', 'string'],
-            'is_active'          => ['required', 'boolean'],
-
-            'type'               => ['required', Rule::in(['percent', 'fixed'])],
-            'value'              => ['required', 'numeric', 'min:0'],
-            'max_discount'       => ['nullable', 'numeric', 'min:0'],
-            'min_order_value'    => ['nullable', 'numeric', 'min:0'],
-
-            'usage_limit'        => ['nullable', 'integer', 'min:0'],
-            'per_customer_limit' => ['nullable', 'integer', 'min:0'],
-
-            'applies_to'         => ['required', Rule::in(['order', 'category', 'brand', 'product'])],
-            'applies_to_ids'     => ['array'],
-            'applies_to_ids.*'   => ['string'],
-
-            'start_at'           => ['nullable', 'date'],
-            'end_at'             => ['nullable', 'date', 'after_or_equal:start_at'],
-        ];
-        if ($r->input('type') === 'percent') {
-            $rules['value'][] = 'max:100';
-        }
-
-        $data = $r->validate($rules);
-
-        $payload = [
-            'code'                   => $data['code'],
-            'name'                   => $data['name'] ?? null,
-            'description'            => $data['description'] ?? null,
-            'is_active'              => (bool) $data['is_active'],
-
-            'discount_type'          => $data['type'],
-            'discount_value'         => (float) $data['value'],
-            'max_discount'           => $data['max_discount'] ?? null,
-            'min_order_total'        => $data['min_order_value'] ?? 0,
-
-            'usage_limit'            => $data['usage_limit'] ?? null,
-            'usage_limit_per_user'   => $data['per_customer_limit'] ?? null,
-
-            'applied_to'             => $data['applies_to'],
-            'applies_to_ids'         => array_values(array_map('strval', $data['applies_to_ids'] ?? [])),
-
-            'starts_at'              => !empty($data['start_at']) ? Carbon::parse($data['start_at']) : null,
-            'ends_at'                => !empty($data['end_at'])   ? Carbon::parse($data['end_at'])   : null,
-        ];
+        $data = $this->validateForm($r, $coupon->id);
+        $payload = $this->mapToPayload($data);
 
         if ($payload['applied_to'] === 'order') {
             $payload['applies_to_ids'] = [];
         }
 
         $coupon->update($payload);
-
         return redirect()->route('admin.coupons.edit', $coupon)->with('ok', 'Cập nhật mã giảm giá thành công!');
     }
 
-    /**
-     * Xoá.
-     */
+    /** Xoá */
     public function destroy(Coupon $coupon)
     {
         $coupon->delete();
         return redirect()->route('admin.coupons.index')->with('ok', 'Đã xoá mã giảm giá.');
     }
 
-    /**
-     * API cho TomSelect: lấy options theo type (brand|category|product)
-     * - q: từ khoá
-     * - page, per: phân trang đơn giản
-     * - ids[]: preload các id cụ thể (khi edit)
-     */
+    /** API TomSelect targets */
     public function targets(Request $r)
     {
         $type = $r->get('type');
@@ -238,32 +162,101 @@ class CouponController extends Controller
             'product'  => Product::query()->select('id', 'name'),
         };
 
-        // preload theo ids (khi mở form edit)
         if (!empty($ids)) {
             $items = $builder->whereIn('id', $ids)->limit(200)->get();
             return response()->json([
-                'results' => $items->map(fn($m) => [
-                    'value' => (string) $m->id,
-                    'text'  => $m->name,
-                ])->values(),
+                'results' => $items->map(fn($m) => ['value' => (string) $m->id, 'text' => $m->name])->values(),
             ]);
         }
 
-        // search theo q
-        if ($q !== '') {
-            $builder->where('name', 'like', "%{$q}%");
-        } else {
-            // không có q thì trả rỗng (tránh tải nặng)
-            return response()->json(['results' => []]);
-        }
+        if ($q === '') return response()->json(['results' => []]);
 
-        $items = $builder->orderBy('name')->forPage($page, $per)->get();
+        $items = $builder->where('name', 'like', "%{$q}%")
+            ->orderBy('name')->forPage($page, $per)->get();
 
         return response()->json([
-            'results' => $items->map(fn($m) => [
-                'value' => (string) $m->id,
-                'text'  => $m->name,
-            ])->values(),
+            'results' => $items->map(fn($m) => ['value' => (string) $m->id, 'text' => $m->name])->values(),
         ]);
+    }
+
+    /** Bật / tắt */
+    public function toggle(Coupon $coupon)
+    {
+        $coupon->is_active = !$coupon->is_active;
+        $coupon->save();
+        return back()->with('ok', $coupon->is_active ? 'Đã bật mã.' : 'Đã tắt mã.');
+    }
+
+    // =================== Helpers ===================
+
+    protected function validateForm(Request $r, $ignoreId = null): array
+    {
+        return $r->validate([
+            'code'               => ['required', 'string', 'max:64', Rule::unique('coupons', 'code')->ignore($ignoreId)],
+            'name'               => ['nullable', 'string', 'max:255'],
+            'description'        => ['nullable', 'string'],
+            'is_active'          => ['required', Rule::in(['0', '1', 0, 1])],
+
+            'type'               => ['required', Rule::in(['percent', 'fixed'])],
+            'value'              => ['required', 'string'],
+
+            'max_discount'       => ['nullable', 'string'],
+            'min_order_value'    => ['nullable', 'string'],
+
+            'usage_limit'        => ['nullable', 'integer', 'min:0'],
+            'per_customer_limit' => ['nullable', 'integer', 'min:0'],
+
+            'applies_to'         => ['required', Rule::in(['order', 'category', 'brand', 'product'])],
+            'applies_to_ids'     => ['array'],
+            'applies_to_ids.*'   => ['string'],
+
+            'start_at'           => ['nullable', 'date'],
+            'end_at'             => ['nullable', 'date', 'after_or_equal:start_at'],
+        ]);
+    }
+
+    /** Map dữ liệu form sang cột DB (đúng schema hiện tại) */
+    protected function mapToPayload(array $data): array
+    {
+        $percent = $this->toFloat($data['value']);
+        $fixed   = $this->toInt($data['value']);
+
+        return [
+            'code'                 => strtoupper(trim($data['code'])),
+            'name'                 => $data['name'] ?? null,
+            'description'          => $data['description'] ?? null,
+            'is_active'            => (bool) $data['is_active'],
+
+            'discount_type'        => $data['type'],
+            'discount_value'       => $data['type'] === 'percent'
+                ? max(0, min(100, $percent))
+                : $fixed,
+            'max_discount'         => $this->toInt($data['max_discount'] ?? null),
+            'min_order_total'      => $this->toInt($data['min_order_value'] ?? null),
+
+            'usage_limit'          => isset($data['usage_limit']) ? (int) $data['usage_limit'] : null,
+            'usage_limit_per_user' => isset($data['per_customer_limit']) ? (int) $data['per_customer_limit'] : null,
+
+            'applied_to'           => $data['applies_to'],
+            'applies_to_ids'       => array_values(array_map('strval', $data['applies_to_ids'] ?? [])),
+
+            'starts_at'            => !empty($data['start_at']) ? Carbon::parse($data['start_at']) : null,
+            'ends_at'              => !empty($data['end_at'])   ? Carbon::parse($data['end_at'])   : null,
+        ];
+    }
+
+    protected function toInt($v): ?int
+    {
+        if ($v === null || $v === '') return null;
+        $s = preg_replace('/\D+/', '', (string) $v);
+        return $s === '' ? 0 : (int) $s;
+    }
+
+    protected function toFloat($v): float
+    {
+        $s = str_replace(',', '.', (string) $v);
+        $s = preg_replace('/[^0-9.]/', '', $s);
+        if ($s === '' || $s === '.') return 0.0;
+        return (float) $s;
     }
 }

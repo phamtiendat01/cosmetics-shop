@@ -21,35 +21,34 @@ class UpdateProductRequest extends FormRequest
             'slug'        => ['nullable', 'string', 'max:255', Rule::unique('products', 'slug')->ignore($product?->id)],
             'brand_id'    => ['nullable', 'exists:brands,id'],
             'category_id' => ['nullable', 'exists:categories,id'],
-            'description' => ['nullable', 'string'],
+            'short_desc'  => ['nullable', 'string'],
+            'long_desc'   => ['nullable', 'string'],
+            'thumbnail'   => ['nullable', 'image', 'max:2048'],
             'image'       => ['nullable', 'image', 'max:2048'],
 
-            'variants'                       => ['required', 'array', 'min:1'],
-            'variants.*.id'                  => ['nullable', 'integer', 'exists:product_variants,id'],
-            'variants.*.name'                => ['nullable', 'string', 'max:255'],
-            'variants.*.sku'                 => [
+            'variants'                    => ['required', 'array', 'min:1'],
+            'variants.*.id'               => ['nullable', 'integer', 'exists:product_variants,id'],
+            'variants.*.name'             => ['nullable', 'string', 'max:255'],
+            'variants.*.sku'              => [
                 'nullable',
                 'string',
                 'max:100',
                 'distinct',
-                'variants.*.sku' => [
-                    'nullable',
-                    'string',
-                    'max:100',
-                    'distinct',
-                    function ($attribute, $value, $fail) {
-                        preg_match('/^variants\.(\d+)\./', $attribute, $m);
-                        $i  = $m[1] ?? null;
-                        $id = $i !== null ? $this->input("variants.$i.id") : null;
-                        $exists = \App\Models\ProductVariant::where('sku', $value)
-                            ->when($id, fn($q) => $q->where('id', '!=', $id))->exists();
-                        if ($exists) $fail('SKU này đã tồn tại.');
-                    },
-                ],
+                function ($attribute, $value, $fail) {
+                    if (!$value) return;
+                    preg_match('/^variants\.(\d+)\./', $attribute, $m);
+                    $i  = $m[1] ?? null;
+                    $id = $i !== null ? $this->input("variants.$i.id") : null;
+                    $exists = \App\Models\ProductVariant::where('sku', $value)
+                        ->when($id, fn($q) => $q->where('id', '!=', $id))
+                        ->exists();
+                    if ($exists) $fail('SKU này đã tồn tại.');
+                },
             ],
-            'variants.*.price'               => ['required', 'numeric', 'min:0'],
-            'variants.*.compare_at_price'    => ['nullable', 'numeric', 'lt:variants.*.price'],
-            'variants.*.qty_in_stock'        => ['required', 'integer', 'min:0'],
+            'variants.*.price'            => ['required', 'numeric', 'min:0'],
+            'variants.*.compare_at_price' => ['nullable', 'numeric', 'min:0'],
+            // 🚫 Không cho nhận tồn kho từ form Edit (tránh reset 0 khi bấm Lưu)
+            'variants.*.qty_in_stock'     => ['prohibited'],
             'variants.*.low_stock_threshold' => ['nullable', 'integer', 'min:0'],
         ];
     }
@@ -66,32 +65,17 @@ class UpdateProductRequest extends FormRequest
     {
         return [
             'name.required'  => 'Vui lòng nhập tên sản phẩm.',
-            'slug.unique'    => 'Slug đã tồn tại, hãy đổi slug hoặc tên sản phẩm.',
+            'slug.unique'    => 'Slug đã tồn tại.',
+            'thumbnail.image' => 'Ảnh đại diện không hợp lệ.',
+            'thumbnail.max'  => 'Ảnh tối đa 2MB.',
             'image.image'    => 'Ảnh đại diện không hợp lệ.',
             'image.max'      => 'Ảnh tối đa 2MB.',
 
-            'variants.required' => 'Vui lòng giữ ít nhất 1 biến thể.',
-            'variants.*.price.required' => 'Giá bán là bắt buộc.',
-            'variants.*.price.min'      => 'Giá bán phải ≥ 0.',
-            'variants.*.compare_at_price.gte' => 'Giá gốc phải < Giá bán.',
-            'variants.*.qty_in_stock.required' => 'Vui lòng nhập tồn kho.',
-            'variants.*.qty_in_stock.min'      => 'Tồn kho không được âm.',
-            'variants.*.sku.distinct'          => 'SKU các biến thể không được trùng nhau.',
-            'variants.*.sku.unique'            => 'SKU này đã tồn tại.',
-        ];
-    }
-
-    public function attributes(): array
-    {
-        return [
-            'name'                         => 'tên sản phẩm',
-            'slug'                         => 'slug',
-            'variants.*.name'              => 'tên biến thể',
-            'variants.*.sku'               => 'SKU',
-            'variants.*.price'             => 'giá bán',
-            'variants.*.compare_at_price'  => 'giá gốc',
-            'variants.*.qty_in_stock'      => 'tồn kho',
-            'variants.*.low_stock_threshold' => 'ngưỡng cảnh báo',
+            'variants.required'          => 'Vui lòng giữ ít nhất 1 biến thể.',
+            'variants.*.price.required'  => 'Giá bán là bắt buộc.',
+            'variants.*.price.min'       => 'Giá bán phải ≥ 0.',
+            'variants.*.sku.distinct'    => 'SKU các biến thể không được trùng nhau.',
+            // (không còn thông báo bắt nhập tồn kho)
         ];
     }
 }

@@ -3,39 +3,51 @@
 namespace App\Http\Controllers\Account;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Http\Request;
+
 
 class CouponController extends Controller
 {
-    // GET /account/coupons – mã khả dụng (đang active & trong hạn)
-    public function index()
+    public function index(Request $r)
     {
-        $now = now();
-        $coupons = DB::table('coupons')
-            ->where('is_active', 1)
-            ->where(function ($q) use ($now) {
-                $q->whereNull('starts_at')->orWhere('starts_at', '<=', $now);
-            })
-            ->where(function ($q) use ($now) {
-                $q->whereNull('ends_at')->orWhere('ends_at', '>=', $now);
-            })
-            ->orderBy('id', 'desc')
-            ->limit(50)
-            ->get(['id', 'code', 'name', 'discount_type', 'discount_value', 'max_discount', 'min_order_total', 'applied_to', 'applies_to_ids', 'starts_at', 'ends_at']);
-        return response()->json(['coupons' => $coupons]);
-    }
+        $uid = $r->user()->id;
 
-    // GET /account/coupons/history – mã đã dùng của tôi
-    public function history()
-    {
-        $userId = Auth::id();
-        $history = DB::table('coupon_redemptions as cr')
-            ->leftJoin('orders as o', 'o.id', '=', 'cr.order_id')
-            ->where('cr.user_id', $userId)
-            ->orderByDesc('cr.redeemed_at')
-            ->get(['cr.code_snapshot', 'cr.discount_amount', 'cr.redeemed_at', 'o.code as order_code']);
-        return response()->json(['history' => $history]);
+        $hasTimes     = Schema::hasColumn('user_coupons', 'times');
+        $hasCouponId  = Schema::hasColumn('user_coupons', 'coupon_id');
+        $hasCouponCode = Schema::hasColumn('user_coupons', 'coupon_code');
+
+        $q = DB::table('user_coupons as uc')
+            ->join('coupons as c', function ($j) use ($hasCouponId, $hasCouponCode) {
+                if ($hasCouponId)  $j->on('c.id', '=', 'uc.coupon_id');
+                if ($hasCouponCode) $j->on('c.code', '=', 'uc.coupon_code');
+            })
+            ->where('uc.user_id', $uid)
+            ->select('c.*');
+
+        if ($hasTimes) {
+            // dùng times của user_coupons, chỉ lấy cái > 0
+            $q->addSelect('uc.times')->where('uc.times', '>', 0);
+        } else {
+            // không có times -> mỗi dòng tương ứng 1 lượt
+            $q->addSelect(DB::raw('COUNT(*) as times'))
+                ->groupBy(
+                    'c.id',
+                    'c.code',
+                    'c.name',
+                    'c.description',
+                    'c.discount_type',
+                    'c.discount_value',
+                    'c.max_discount',
+                    'c.min_order_total',
+                    'c.starts_at',
+                    'c.ends_at',
+                    'c.is_active'
+                );
+        }
+
+        $coupons = $q->orderBy('c.starts_at', 'desc')->get();
+        return view('account.coupons.index', compact('coupons'));
     }
 }

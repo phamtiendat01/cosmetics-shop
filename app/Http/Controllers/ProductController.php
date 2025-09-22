@@ -14,7 +14,7 @@ class ProductController extends Controller
                 'brand:id,name,slug',
                 'category:id,name,slug',
                 'variants' => fn($q) => $q->active()->orderBy('price'),
-                'reviews' // nếu bạn hiển thị đánh giá
+                'approvedReviews'
             ])->firstOrFail();
 
         // related: cùng danh mục, khác id, mới nhất
@@ -23,8 +23,12 @@ class ProductController extends Controller
             ->where('id', '<>', $product->id)
             ->withMin('variants as min_price', 'price')
             ->withMin('variants as min_compare_at_price', 'compare_at_price')
+            // >>> THÊM 2 DÒNG NÀY <<<
+            ->withAvg('approvedReviews as avg_rating', 'rating')
+            ->withCount('approvedReviews as reviews_count')
             ->latest('id')->take(12)
-            ->get(['id', 'name', 'slug', 'image', 'brand_id', 'category_id']);
+            ->get(['id', 'name', 'slug', 'image', 'thumbnail', 'brand_id', 'category_id']);
+
 
         return view('product.show', compact('product', 'related'));
     }

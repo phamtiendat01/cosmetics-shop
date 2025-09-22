@@ -18,6 +18,7 @@
                 <label class="label">Mã giảm giá <span class="text-rose-600">*</span></label>
                 <input name="code" value="{{ old('code',$coupon->code) }}" class="form-control" required>
             </div>
+
             <div>
                 <label class="label">Tên hiển thị</label>
                 <input name="name" value="{{ old('name',$coupon->name) }}" class="form-control">
@@ -34,50 +35,61 @@
             <div>
                 <label class="label">Loại giảm</label>
                 <select name="type" class="form-control">
-                    <option value="percent" @selected(old('type',$coupon->type)==='percent')>% theo đơn</option>
-                    <option value="fixed" @selected(old('type',$coupon->type)==='fixed')>Số tiền cố định</option>
+                    <option value="percent" @selected(old('type',$coupon->discount_type)==='percent')>% theo đơn</option>
+                    <option value="fixed" @selected(old('type',$coupon->discount_type)==='fixed')>Số tiền cố định</option>
                 </select>
             </div>
 
             <div>
                 <label class="label">Giá trị giảm <span class="text-rose-600">*</span></label>
-                <input name="value" type="number" step="0.01" min="0" value="{{ old('value',$coupon->value) }}" class="form-control" required>
+                {{-- để text + inputmode tránh lỗi dấu phẩy/chấm trên trình duyệt --}}
+                <input name="value" type="text" inputmode="decimal"
+                    value="{{ old('value',$coupon->discount_value) }}" class="form-control" required>
+                <div class="help mt-1">Ví dụ: <b>10</b> (nếu là %), <b>50000</b> (nếu là số tiền).</div>
             </div>
 
             <div>
                 <label class="label">Giảm tối đa (nếu là %)</label>
-                <input name="max_discount" type="number" step="0.01" min="0" value="{{ old('max_discount',$coupon->max_discount) }}" class="form-control">
+                <input name="max_discount" type="text" inputmode="numeric"
+                    value="{{ old('max_discount',$coupon->max_discount) }}" class="form-control">
             </div>
 
             <div>
                 <label class="label">Điều kiện tối thiểu (đơn hàng)</label>
-                <input name="min_order_value" type="number" step="0.01" min="0" value="{{ old('min_order_value',$coupon->min_order_value) }}" class="form-control">
+                <input name="min_order_value" type="text" inputmode="numeric"
+                    value="{{ old('min_order_value',$coupon->min_order_total) }}" class="form-control">
             </div>
 
             <div>
                 <label class="label">Giới hạn tổng lượt dùng</label>
-                <input name="usage_limit" type="number" min="0" value="{{ old('usage_limit',$coupon->usage_limit) }}" class="form-control">
+                <input name="usage_limit" type="number" min="0"
+                    value="{{ old('usage_limit',$coupon->usage_limit) }}" class="form-control">
             </div>
 
             <div>
                 <label class="label">Giới hạn mỗi khách</label>
-                <input name="per_customer_limit" type="number" min="0" value="{{ old('per_customer_limit',$coupon->per_customer_limit) }}" class="form-control">
+                <input name="per_customer_limit" type="number" min="0"
+                    value="{{ old('per_customer_limit',$coupon->usage_limit_per_user) }}" class="form-control">
             </div>
 
             <div>
                 <label class="label">Bắt đầu áp dụng</label>
-                <input name="start_at" id="startAt" value="{{ old('start_at', optional($coupon->start_at)->format('Y-m-d H:i')) }}" class="form-control" placeholder="YYYY-MM-DD HH:mm">
+                <input name="start_at" id="startAt"
+                    value="{{ old('start_at', optional($coupon->starts_at)->format('Y-m-d H:i')) }}"
+                    class="form-control" placeholder="YYYY-MM-DD HH:mm">
             </div>
 
             <div>
                 <label class="label">Kết thúc</label>
-                <input name="end_at" id="endAt" value="{{ old('end_at', optional($coupon->end_at)->format('Y-m-d H:i')) }}" class="form-control" placeholder="YYYY-MM-DD HH:mm">
+                <input name="end_at" id="endAt"
+                    value="{{ old('end_at', optional($coupon->ends_at)->format('Y-m-d H:i')) }}"
+                    class="form-control" placeholder="YYYY-MM-DD HH:mm">
             </div>
 
             <div>
                 <label class="label">Áp dụng cho</label>
                 <select name="applies_to" id="appliedTo" class="form-control">
-                    @php $appliesToOld = old('applies_to', $coupon->applies_to); @endphp
+                    @php $appliesToOld = old('applies_to', $coupon->applied_to); @endphp
                     <option value="order" @selected($appliesToOld==='order' )>Toàn bộ đơn</option>
                     <option value="category" @selected($appliesToOld==='category' )>Theo danh mục</option>
                     <option value="brand" @selected($appliesToOld==='brand' )>Theo thương hiệu</option>
@@ -161,12 +173,10 @@
         if (e.target === modal) modal.classList.add('hidden');
     });
 
-    // ============ TomSelect remote cho applies_to_ids ============
+    // ======= TomSelect remote cho applies_to_ids =======
     const appliedTo = document.getElementById('appliedTo');
     const appliesSel = document.getElementById('appliesSelect');
     const wrap = document.getElementById('appliesWrap');
-
-    // IDs đã có sẵn (edit)
 
     const preselected = @json($preselected);
 
@@ -187,7 +197,6 @@
                 url.searchParams.set('page', 1);
                 url.searchParams.set('per', 20);
             } else {
-                // nếu không có query mà chưa có option -> không load gì, tránh nặng
                 return callback();
             }
             fetch(url).then(r => r.json()).then(json => callback(json.results || [])).catch(() => callback());
@@ -225,7 +234,6 @@
     }
 
     appliedTo.addEventListener('change', toggleApplies);
-    // Lần đầu
     toggleApplies();
 </script>
 @endpush

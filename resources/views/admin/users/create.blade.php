@@ -20,7 +20,7 @@
         @csrf
 
         <div>
-            <label class="form-label">Họ tên</label>
+            <label class="form-label">Họ và tên</label>
             <input name="name" value="{{ old('name') }}" class="form-control" required>
         </div>
 

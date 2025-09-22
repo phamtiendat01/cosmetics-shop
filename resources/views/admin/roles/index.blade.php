@@ -112,7 +112,7 @@ $currentRole = $roles->firstWhere('id', (int)request('role')) ?? $roles->first()
                         Đang chỉnh: <span class="font-medium text-rose-700">{{ $currentRole->name }}</span>
                         @if(in_array($currentRole->name, ['super-admin']))
                         <span class="ml-2 text-xs px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            Super-admin: có toàn bộ quyền
+                            Super-admin: Có toàn bộ quyền
                         </span>
                         @endif
                     </div>

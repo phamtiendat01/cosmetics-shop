@@ -14,9 +14,7 @@ use Throwable;
 
 class ProductController extends Controller
 {
-    /* ================= Helpers ================= */
-
-    /** Gom các danh mục CON theo danh mục CHA để đổ vào select (optgroup) */
+    /** Gom danh mục con theo danh mục cha để đổ vào select (optgroup) */
     private function categoryLeafOptionsGrouped(): array
     {
         $parents = Category::whereNull('parent_id')
@@ -26,25 +24,20 @@ class ProductController extends Controller
                 $q->where('is_active', 1)->orderBy('sort_order')->orderBy('name');
             }])->get();
 
-        // Trả về dạng: ['Chăm sóc da mặt' => [ ['id'=>..,'name'=>..], ... ], ...]
         return $parents->mapWithKeys(function ($p) {
             $kids = $p->children->map(fn($c) => ['id' => $c->id, 'name' => $c->name])->all();
             return [$p->name => $kids];
         })->filter()->toArray();
     }
 
-    /* ================= LIST + FILTER ================= */
-
     public function index(Request $r)
     {
-        // Base query để dùng lại nhiều lần
         $base = Product::query()
             ->with(['brand:id,name', 'category:id,name'])
             ->withMin('variants as min_price', 'price')
             ->withMax('variants as max_price', 'price')
             ->withSum('inventories as stock', 'qty_in_stock');
 
-        // ----- Đếm cho tabs (không phụ thuộc filter khác) -----
         $counts = [
             'all'       => (clone $base)->count(),
             'active'    => (clone $base)->where('is_active', 1)->count(),
@@ -57,40 +50,31 @@ class ProductController extends Controller
             'novariant' => (clone $base)->doesntHave('variants')->count(),
         ];
 
-        // ----- Áp filter theo request -----
         $listQ = clone $base;
 
-        // Từ khoá: tên / mô tả
         if ($kw = trim((string) $r->keyword)) {
             $listQ->where(function ($w) use ($kw) {
                 $w->where('name', 'like', "%$kw%")
-                    ->orWhere('description', 'like', "%$kw%");
+                    ->orWhere('short_desc', 'like', "%$kw%")
+                    ->orWhere('long_desc',  'like', "%$kw%");
             });
         }
 
-        // Lọc theo brand / category
-        if ($r->filled('brand_id')) {
-            $listQ->where('brand_id', $r->brand_id);
-        }
-        if ($r->filled('category_id')) {
-            $listQ->where('category_id', $r->category_id);
-        }
+        if ($r->filled('brand_id'))    $listQ->where('brand_id', $r->brand_id);
+        if ($r->filled('category_id')) $listQ->where('category_id', $r->category_id);
 
-        // Tab trạng thái
         $status = $r->get('status');
         match ($status) {
             'active'   => $listQ->where('is_active', 1),
             'inactive' => $listQ->where('is_active', 0),
             'low'      => $listQ->whereHas('variants.inventory', fn($q) =>
-            $q->whereColumn('qty_in_stock', '<=', 'low_stock_threshold')
-                ->where('low_stock_threshold', '>', 0)),
+            $q->whereColumn('qty_in_stock', '<=', 'low_stock_threshold')->where('low_stock_threshold', '>', 0)),
             'out'      => $listQ->whereHas('variants.inventory', fn($q) => $q->where('qty_in_stock', '<=', 0)),
             'novariant' => $listQ->doesntHave('variants'),
             default    => null,
         };
 
-        // Sort
-        $sort = $r->get('sort', 'newest'); // newest | price_asc | price_desc | stock_desc
+        $sort = $r->get('sort', 'newest');
         match ($sort) {
             'price_asc'  => $listQ->orderBy('min_price')->orderByDesc('id'),
             'price_desc' => $listQ->orderByDesc('max_price')->orderByDesc('id'),
@@ -98,7 +82,6 @@ class ProductController extends Controller
             default      => $listQ->orderByDesc('id'),
         };
 
-        // Phân trang
         $products = $listQ->paginate(20)->withQueryString();
 
         return view('admin.products.index', [
@@ -118,28 +101,27 @@ class ProductController extends Controller
         ]);
     }
 
-    /* ================= STORE ================= */
-
     public function store(StoreProductRequest $request)
     {
         $data = $request->validated();
 
-        // Sinh slug duy nhất
         $slugBase = Str::slug($data['slug'] ?? $data['name']);
         $slug     = $this->uniqueSlug($slugBase);
 
         DB::beginTransaction();
         try {
-            // 1) Tạo sản phẩm
             $product = new Product();
             $product->name        = $data['name'];
             $product->slug        = $slug;
             $product->brand_id    = $data['brand_id'] ?? null;
             $product->category_id = $data['category_id'] ?? null;
-            $product->description = $data['description'] ?? null;
+
+            // ✅ Chỉ dùng short_desc & long_desc
+            $product->short_desc  = $data['short_desc'] ?? null;
+            $product->long_desc   = $data['long_desc']  ?? null;
+
             $product->save();
 
-            // 2) Biến thể + kho
             $variants = $this->cleanVariants($data['variants'] ?? []);
             if ($variants->isEmpty()) {
                 throw new \Exception('Vui lòng thêm ít nhất 1 biến thể có giá.');
@@ -162,10 +144,12 @@ class ProductController extends Controller
 
             DB::commit();
 
-            // 3) Ảnh (ngoài transaction)
-            if ($request->hasFile('image')) {
-                $path = $request->file('image')->store('products', 'public');
-                $product->update(['image' => $path]);
+            // Ảnh: chấp nhận 'thumbnail' hoặc 'image'
+            if ($request->hasFile('thumbnail') || $request->hasFile('image')) {
+                $file = $request->file('thumbnail') ?? $request->file('image');
+                $path = $file->store('products', 'public');
+                $product->thumbnail = $path;
+                $product->save();
             }
 
             return redirect()->route('admin.products.index')->with('ok', 'Tạo sản phẩm thành công!');
@@ -178,7 +162,11 @@ class ProductController extends Controller
 
     public function edit(Product $product)
     {
-        $product->load(['variants.inventory']);
+        $product->load([
+            'variants.inventory',
+            'variants.adjustments' => fn($q) => $q->latest()->limit(5) // show 5 log gần nhất
+        ]);
+
 
         return view('admin.products.edit', [
             'product'        => $product,
@@ -187,35 +175,33 @@ class ProductController extends Controller
         ]);
     }
 
-    /* ================= UPDATE ================= */
-
     public function update(UpdateProductRequest $request, Product $product)
     {
         $data = $request->validated();
 
         DB::beginTransaction();
         try {
-            // 1) Info cơ bản
             $product->name = $data['name'];
             if (!empty($data['slug'])) {
                 $product->slug = $this->uniqueSlug(Str::slug($data['slug']), $product->id);
             }
             $product->brand_id    = $data['brand_id'] ?? null;
             $product->category_id = $data['category_id'] ?? null;
-            $product->description = $data['description'] ?? null;
+
+            // ✅ Chỉ dùng short_desc & long_desc
+            $product->short_desc  = $data['short_desc'] ?? null;
+            $product->long_desc   = $data['long_desc']  ?? null;
+
             $product->save();
 
-            // 2) Đồng bộ biến thể + kho
             $variants = $this->cleanVariants($data['variants'] ?? []);
             if ($variants->isEmpty()) {
                 throw new \Exception('Vui lòng giữ ít nhất 1 biến thể có giá.');
             }
 
             $keepIds = [];
-
             foreach ($variants as $v) {
                 if (!empty($v['id'])) {
-                    // Cập nhật
                     $pv = ProductVariant::where('product_id', $product->id)
                         ->whereKey($v['id'])->firstOrFail();
 
@@ -229,14 +215,12 @@ class ProductController extends Controller
                     $pv->inventory()->updateOrCreate(
                         ['product_variant_id' => $pv->id],
                         [
-                            'qty_in_stock'        => $v['qty_in_stock'] ?? 0,
                             'low_stock_threshold' => $v['low_stock_threshold'] ?? 0,
                         ]
                     );
 
                     $keepIds[] = $pv->id;
                 } else {
-                    // Tạo mới
                     $pv = $product->variants()->create([
                         'name'             => $v['name'] ?? null,
                         'sku'              => $v['sku'] ?? null,
@@ -254,7 +238,6 @@ class ProductController extends Controller
                 }
             }
 
-            // Xoá biến thể không còn
             ProductVariant::where('product_id', $product->id)
                 ->whereNotIn('id', $keepIds)
                 ->get()
@@ -265,11 +248,14 @@ class ProductController extends Controller
 
             DB::commit();
 
-            // 3) Ảnh mới
-            if ($request->hasFile('image')) {
-                $old = $product->image;
-                $path = $request->file('image')->store('products', 'public');
-                $product->update(['image' => $path]);
+            // Ảnh mới: chấp nhận 'thumbnail' hoặc 'image'
+            if ($request->hasFile('thumbnail') || $request->hasFile('image')) {
+                $file = $request->file('thumbnail') ?? $request->file('image');
+                $old  = $product->thumbnail;
+                $path = $file->store('products', 'public');
+                $product->thumbnail = $path;
+                $product->save();
+
                 if ($old && Storage::disk('public')->exists($old)) {
                     Storage::disk('public')->delete($old);
                 }
@@ -283,8 +269,6 @@ class ProductController extends Controller
         }
     }
 
-    /* ================= DESTROY ================= */
-
     public function destroy(Product $product)
     {
         DB::beginTransaction();
@@ -294,7 +278,7 @@ class ProductController extends Controller
                 $pv->delete();
             }
 
-            $img = $product->image;
+            $img = $product->thumbnail;
             $product->delete();
 
             DB::commit();
@@ -311,9 +295,6 @@ class ProductController extends Controller
         }
     }
 
-    /* ================= Misc helpers ================= */
-
-    /** Tạo slug duy nhất (bỏ qua $ignoreId nếu có) */
     private function uniqueSlug(string $base, ?int $ignoreId = null): string
     {
         $slug = $base ?: Str::random(8);
@@ -331,14 +312,18 @@ class ProductController extends Controller
         return $slug;
     }
 
-    /** Lọc bỏ biến thể rỗng giá + ép kiểu tồn kho */
     private function cleanVariants(array $variants)
     {
         return collect($variants)
             ->filter(fn($v) => isset($v['price']) && $v['price'] !== '' && $v['price'] !== null)
             ->map(function ($v) {
-                $v['qty_in_stock']        = isset($v['qty_in_stock']) ? (int)$v['qty_in_stock'] : 0;
-                $v['low_stock_threshold'] = isset($v['low_stock_threshold']) ? (int)$v['low_stock_threshold'] : 0;
+                // 🔒 Chỉ ép kiểu nếu field có trong request
+                if (array_key_exists('qty_in_stock', $v)) {
+                    $v['qty_in_stock'] = (int) $v['qty_in_stock'];
+                }
+                if (array_key_exists('low_stock_threshold', $v)) {
+                    $v['low_stock_threshold'] = (int) $v['low_stock_threshold'];
+                }
                 return $v;
             })
             ->values();

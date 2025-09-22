@@ -4,43 +4,57 @@ namespace App\Http\Controllers\Account;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use Illuminate\Support\Arr;
-use Illuminate\Support\Facades\DB;
+use App\Models\Product;
 
 class WishlistController extends Controller
 {
-    // GET /account/wishlist
+    // Trang danh sách yêu thích (render Blade)
     public function index(Request $request)
     {
-        $ids = $request->session()->get('wishlist', []); // MVP: lưu session
-        $variants = [];
-        if ($ids) {
-            $variants = DB::table('product_variants as pv')
-                ->join('products as p', 'p.id', '=', 'pv.product_id')
-                ->whereIn('pv.id', $ids)
-                ->select('pv.id', 'pv.name as variant_name', 'pv.price', 'p.name as product_name', 'p.slug')
-                ->get();
-        }
-        return response()->json(['items' => $variants, 'count' => count($ids)]);
+        $ids = array_values(array_unique(array_map('intval', (array) $request->session()->get('wishlist', []))));
+        $products = !empty($ids)
+            ? Product::whereIn('id', $ids)->where('is_active', 1)->get()
+            : collect();
+
+        return view('account.wishlist', compact('products'));
     }
 
-    // POST /account/wishlist
-    public function store(Request $request)
+    // API: thêm / bỏ yêu thích (SESSION JSON)
+    public function toggle(Request $request)
     {
-        $data = $request->validate(['variant_id' => 'required|integer']);
-        $wishlist = $request->session()->get('wishlist', []);
-        if (!in_array($data['variant_id'], $wishlist)) {
-            $wishlist[] = $data['variant_id'];
-            $request->session()->put('wishlist', $wishlist);
+        $id = (int) $request->integer('product_id');
+
+        $wishlist = collect((array) $request->session()->get('wishlist', []))
+            ->map(fn($v) => (int) $v)
+            ->unique()
+            ->values();
+
+        $action = 'added';
+        if ($wishlist->contains($id)) {
+            $wishlist = $wishlist->reject(fn($v) => $v === $id)->values();
+            $action = 'removed';
+        } else {
+            if ($id > 0) {
+                $wishlist = $wishlist->push($id)->unique()->values();
+            }
         }
-        return $this->index($request);
+
+        $request->session()->put('wishlist', $wishlist->all());
+
+        return response()->json([
+            'ok'    => true,
+            'action' => $action,
+            'id'    => $id,
+            'count' => $wishlist->count(),
+        ]);
     }
 
-    // DELETE /account/wishlist/{variant_id}
-    public function destroy(Request $request, $variant_id)
+    // API: lấy số lượng
+    public function count(Request $request)
     {
-        $wishlist = array_values(array_filter($request->session()->get('wishlist', []), fn($id) => (int)$id !== (int)$variant_id));
-        $request->session()->put('wishlist', $wishlist);
-        return $this->index($request);
+        return response()->json([
+            'ok'    => true,
+            'count' => count((array) $request->session()->get('wishlist', [])),
+        ]);
     }
 }

@@ -19,8 +19,10 @@ class CategoryController extends Controller
             ->withMin('variants as min_price', 'price')
             ->withMax('variants as max_price', 'price')
             ->withMin('variants as min_compare_at_price', 'compare_at_price')
-            ->withAvg('reviews as avg_rating', 'rating')     // nếu có bảng reviews
-            ->withCount('reviews as reviews_count');
+            ->withAvg('approvedReviews as avg_rating', 'rating')      // <<<
+            ->withCount('approvedReviews as reviews_count')           // <<<
+            ->withAvg('approvedReviews as avg_rating', 'rating')
+            ->withCount('approvedReviews as reviews_count');
 
         // FILTERS
         if ($brand = request('brand_id')) {
@@ -39,7 +41,7 @@ class CategoryController extends Controller
             $q->having('avg_rating', '>=', (int)$rating); // dùng having vì là select tính toán
         }
         if (request()->boolean('in_stock')) {
-            $q->whereHas('variants.inventory', fn($qq) => $qq->where('stock', '>', 0));
+            $q->whereHas('variants.inventory', fn($qq) => $qq->where('qty_in_stock', '>', 0));
         }
 
         // SORT

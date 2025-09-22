@@ -142,4 +142,9 @@ class Order extends Model
     {
         $this->events()->create(['type' => $type, 'old' => $old, 'new' => $new, 'meta' => $meta]);
     }
+
+    public function payments()
+    {
+        return $this->hasMany(\App\Models\OrderPayment::class);
+    }
 }

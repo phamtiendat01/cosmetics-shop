@@ -97,7 +97,7 @@
         <div class="card p-3">
             <div class="text-sm text-slate-500">Thanh toán & Trạng thái</div>
 
-            <form method="post" action="{{ route('admin.orders.update',$order) }}" class="space-y-2">
+            <form method="post" action="{{ route('admin.orders.update', ['admin_order' => $order->id]) }}" class="space-y-2">
                 @csrf @method('PUT')
                 <div>
                     <label class="label">Trạng thái đơn</label>

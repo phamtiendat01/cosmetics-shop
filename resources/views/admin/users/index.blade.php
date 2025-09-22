@@ -14,7 +14,7 @@
     <div class="toolbar-title">Quản lý quản trị viên</div>
     <div class="toolbar-actions">
         <a href="{{ route('admin.users.create') }}" class="btn btn-primary btn-sm">
-            <i class="fa-solid fa-user-plus"></i> Thêm quản trị viên
+            <i class="fa-solid fa-user-plus"></i> Thêm quản trị viên mới
         </a>
     </div>
 </div>

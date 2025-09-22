@@ -2,43 +2,60 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Product;
+use App\Models\Banner;
 use App\Models\Brand;
+use App\Models\Product;
 
 class HomeController extends Controller
 {
     public function index()
     {
-        // Top brands cho strip
-        $topBrands = Brand::active()
-            ->orderByRaw('COALESCE(sort_order,999999), name')
+        $pool = Product::query()
+            ->with(['brand:id,name,slug', 'category:id,name,slug'])
+            ->with(['variants:id,product_id,price,compare_at_price'])
+            ->withMin('variants as min_price', 'price')
+            ->withMin('variants as min_compare', 'compare_at_price')
+
+            // ⭐ lấy trung bình sao & số lượt chỉ từ ratedReviews (đã xử lý approved/rating null)
+            ->withAvg('ratedReviews as avg_rating', 'rating')
+            ->withCount('ratedReviews as reviews_count')
+
+            ->orderByDesc('id')
+            ->get();
+
+        $calcDiscount = function ($p) {
+            $price = (float) ($p->min_price ?? 0);
+            $cmp   = (float) ($p->min_compare ?? 0);
+            if ($cmp > 0 && $cmp > $price) {
+                return (int) round(100 * ($cmp - $price) / $cmp);
+            }
+            return 0;
+        };
+        $pool->each(fn($p) => $p->discount_percent = $calcDiscount($p));
+
+        $flashSale  = $pool->filter(fn($p) => $p->discount_percent >= 50)->take(12)->values();
+        $excluded   = $flashSale->pluck('id')->all();
+
+        $suggested  = $pool->reject(fn($p) => in_array($p->id, $excluded))
+            ->filter(fn($p) => $p->discount_percent >= 30 && $p->discount_percent < 50)
+            ->take(12)->values();
+        $excluded   = array_merge($excluded, $suggested->pluck('id')->all());
+
+        $newProducts = $pool->reject(fn($p) => in_array($p->id, $excluded))
+            ->filter(fn($p) => $p->discount_percent < 30)
+            ->take(20)->values();
+
+        $banners = Banner::visibleNow()
+            ->where('position', 'hero')
+            ->orderByRaw('COALESCE(sort_order, 999999), id DESC')
+            ->get(['id', 'title', 'image', 'mobile_image', 'url', 'open_in_new_tab']);
+
+        $topBrands = Brand::query()
+            ->where('is_active', 1)
+            ->orderByRaw('COALESCE(sort_order, 999999), name')
             ->take(12)
             ->get(['id', 'name', 'slug', 'logo']);
 
-        // Sản phẩm gợi ý + mới (đã có UI grid + carousel)
-        $baseSelect = ['id', 'name', 'slug', 'image', 'brand_id', 'category_id'];
-        $with = [
-            'brand:id,name,slug',
-            'category:id,name,slug',
-        ];
-
-        $suggested = Product::active()
-            ->with($with)
-            ->withCount('variants')                                // để Quick-Add xác định 1 biến thể
-            ->with(['variants' => fn($q) => $q->oldest()->limit(1)]) // lấy 1 variant đầu cho quick-add
-            ->withMin('variants as min_price', 'price')
-            ->withMin('variants as min_compare_at_price', 'compare_at_price')
-            ->latest('id')->take(12)->get($baseSelect);
-
-        $newProducts = Product::active()
-            ->with($with)->withCount('variants')->with(['variants' => fn($q) => $q->oldest()->limit(1)])
-            ->withMin('variants as min_price', 'price')
-            ->withMin('variants as min_compare_at_price', 'compare_at_price')
-            ->latest('id')->take(20)->get($baseSelect);
-
-        // Hero slides: nếu bạn đã có bảng banners thì lấy từ đó; chưa có thì để null và UI hiển thị placeholder
-        $heroSlides = []; // hoặc Banner::active()->where('placement','home-hero')->orderBy('sort_order')->get();
-
-        return view('home.index', compact('topBrands', 'suggested', 'newProducts', 'heroSlides'));
+        return view('home.index', compact('flashSale', 'suggested', 'newProducts', 'banners', 'topBrands'));
     }
 }
