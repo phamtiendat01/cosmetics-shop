@@ -1,100 +1,117 @@
 @extends('admin.layouts.app')
-@section('title', 'CosmeBot - Chủ đề trò chuyện')
+@section('title', 'CosmeBot - Quản lý Chủ đề (Intents)')
 
 @section('content')
-<div class="mb-6 flex items-center justify-between">
-    <div>
-        <h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <i class="fa-solid fa-brain text-rose-600"></i>
-            Chủ đề trò chuyện (Intents)
-        </h1>
-        <p class="text-slate-600 mt-1">Quản lý các chủ đề mà bot có thể hiểu và trả lời (VD: Tìm sản phẩm, Tra cứu đơn, Hỏi về chính sách...)</p>
-        <div class="mt-2 text-sm text-amber-600 bg-amber-50 px-3 py-2 rounded-lg inline-block">
-            <i class="fa-solid fa-lightbulb mr-1"></i>
-            <strong>Gợi ý:</strong> Thêm các chủ đề như "Tìm sản phẩm", "Tra cứu đơn hàng", "Hỏi về phí ship", "Chính sách đổi trả"...
-        </div>
+@if(session('ok'))
+<div class="alert alert-success mb-3" data-auto-dismiss="3000">{{ session('ok') }}</div>
+@endif
+@if($errors->any())
+<div class="alert alert-danger mb-3">{{ $errors->first() }}</div>
+@endif
+
+<div class="toolbar">
+    <div class="toolbar-title">Quản lý Chủ đề (Intents)</div>
+    <div class="toolbar-actions">
+        <button onclick="openModal()" class="btn btn-primary btn-sm">+ Thêm</button>
     </div>
-    <button onclick="document.getElementById('intentModal').classList.remove('hidden')" 
-        class="px-4 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition flex items-center gap-2">
-        <i class="fa-solid fa-plus"></i> Thêm chủ đề
-    </button>
 </div>
 
 {{-- Stats Cards --}}
-<div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-    <div class="bg-white border border-slate-200 rounded-xl p-4">
-        <div class="text-2xl font-bold text-rose-600 mb-1">{{ $intents->total() }}</div>
-        <div class="text-sm text-slate-600">Tổng chủ đề</div>
+<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+    <div class="card p-3" style="animation: fadeInUp 0.4s ease-out 0.1s backwards;">
+        <div class="text-2xl font-bold mb-0.5">{{ $intents->total() }}</div>
+        <div class="text-xs text-slate-500">Tổng chủ đề</div>
     </div>
-    <div class="bg-white border border-slate-200 rounded-xl p-4">
-        <div class="text-2xl font-bold text-green-600 mb-1">{{ $intents->where('is_active', true)->count() }}</div>
-        <div class="text-sm text-slate-600">Đang hoạt động</div>
+    <div class="card p-3" style="animation: fadeInUp 0.4s ease-out 0.2s backwards;">
+        <div class="text-2xl font-bold mb-0.5">{{ $intents->where('is_active', true)->count() }}</div>
+        <div class="text-xs text-slate-500">Đang hoạt động</div>
     </div>
-    <div class="bg-white border border-slate-200 rounded-xl p-4">
-        <div class="text-2xl font-bold text-blue-600 mb-1">{{ $intents->where('is_active', false)->count() }}</div>
-        <div class="text-sm text-slate-600">Đã tắt</div>
+    <div class="card p-3" style="animation: fadeInUp 0.4s ease-out 0.3s backwards;">
+        <div class="text-2xl font-bold mb-0.5">{{ $intents->where('is_active', false)->count() }}</div>
+        <div class="text-xs text-slate-500">Đã tắt</div>
     </div>
-    <div class="bg-white border border-slate-200 rounded-xl p-4">
-        <div class="text-2xl font-bold text-purple-600 mb-1">{{ $intents->max('priority') ?? 0 }}</div>
-        <div class="text-sm text-slate-600">Độ ưu tiên cao nhất</div>
+    <div class="card p-3" style="animation: fadeInUp 0.4s ease-out 0.4s backwards;">
+        <div class="text-2xl font-bold mb-0.5">{{ $intents->sum(fn($i) => count($i->examples ?? [])) }}</div>
+        <div class="text-xs text-slate-500">Tổng examples</div>
     </div>
 </div>
 
+<style>
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(15px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+.table-admin tbody tr {
+    animation: fadeInUp 0.3s ease-out backwards;
+}
+</style>
+
 {{-- Table --}}
-<div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-    <table class="w-full">
-        <thead class="bg-slate-50 border-b border-slate-200">
+<div class="card table-wrap p-0">
+    <table class="table-admin">
+        <thead>
             <tr>
-                <th class="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase">Tên chủ đề</th>
-                <th class="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase">Mô tả</th>
-                <th class="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase">Độ ưu tiên</th>
-                <th class="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase">Trạng thái</th>
-                <th class="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase">Thao tác</th>
+                <th>Tên chủ đề</th>
+                <th>Examples</th>
+                <th>Tools</th>
+                <th>Độ ưu tiên</th>
+                <th>Trạng thái</th>
+                <th class="col-actions">Thao tác</th>
             </tr>
         </thead>
-        <tbody class="divide-y divide-slate-200">
-            @forelse($intents as $intent)
-            <tr class="hover:bg-slate-50">
-                <td class="px-6 py-4">
-                    <div class="font-medium text-slate-900">{{ $intent->display_name }}</div>
-                    <div class="text-xs text-slate-500 font-mono mt-1">{{ $intent->name }}</div>
-                </td>
-                <td class="px-6 py-4">
-                    <div class="text-sm text-slate-700 max-w-md">{{ Str::limit($intent->description ?? 'Chưa có mô tả', 80) }}</div>
-                </td>
-                <td class="px-6 py-4">
-                    <span class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-semibold">
-                        {{ $intent->priority }}
-                    </span>
-                    <div class="text-xs text-slate-500 mt-1">Số càng cao càng ưu tiên</div>
-                </td>
-                <td class="px-6 py-4">
-                    @if($intent->is_active)
-                    <span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-semibold flex items-center gap-1 w-fit">
-                        <i class="fa-solid fa-check-circle text-xs"></i> Hoạt động
-                    </span>
-                    @else
-                    <span class="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs font-semibold flex items-center gap-1 w-fit">
-                        <i class="fa-solid fa-pause-circle text-xs"></i> Tắt
-                    </span>
+        <tbody>
+            @forelse($intents as $index => $intent)
+            <tr style="animation-delay: {{ 0.5 + ($index * 0.03) }}s;">
+                <td>
+                    <div class="font-medium mb-0.5">{{ $intent->display_name }}</div>
+                    <div class="text-xs text-slate-500 font-mono bg-slate-50 px-1.5 py-0.5 rounded inline-block">{{ $intent->name }}</div>
+                    @if($intent->description)
+                    <div class="text-xs text-slate-600 mt-1 max-w-md line-clamp-1">{{ Str::limit($intent->description, 60) }}</div>
                     @endif
                 </td>
-                <td class="px-6 py-4">
-                    <button onclick="editIntent(@json($intent))" 
-                        class="text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center gap-1">
-                        <i class="fa-solid fa-edit"></i> Sửa
-                    </button>
+                <td>
+                    <span class="badge">{{ count($intent->examples ?? []) }} câu</span>
+                </td>
+                <td>
+                    @php
+                    $tools = $intent->config['tools'] ?? [];
+                    @endphp
+                    @if(!empty($tools))
+                    <div class="flex flex-wrap gap-1">
+                        @foreach(array_slice($tools, 0, 2) as $toolName)
+                        <span class="badge">{{ $toolName }}</span>
+                        @endforeach
+                        @if(count($tools) > 2)
+                        <span class="badge">+{{ count($tools) - 2 }}</span>
+                        @endif
+                    </div>
+                    @else
+                    <span class="text-xs text-slate-400">—</span>
+                    @endif
+                </td>
+                <td>
+                    <span class="text-xs font-medium">{{ $intent->priority ?? 0 }}</span>
+                </td>
+                <td>
+                    @if($intent->is_active)
+                    <span class="badge badge-green"><span class="badge-dot"></span>Hoạt động</span>
+                    @else
+                    <span class="badge badge-red"><span class="badge-dot"></span>Tắt</span>
+                    @endif
+                </td>
+                <td class="col-actions">
+                    <button onclick="editIntent({{ json_encode($intent) }})" class="btn btn-table btn-outline">Sửa</button>
                 </td>
             </tr>
             @empty
             <tr>
-                <td colspan="5" class="px-6 py-8 text-center">
-                    <div class="text-slate-500 mb-2">
-                        <i class="fa-solid fa-inbox text-4xl mb-3"></i>
-                    </div>
-                    <p class="text-slate-600 font-medium">Chưa có chủ đề nào</p>
-                    <p class="text-sm text-slate-500 mt-1">Hãy thêm chủ đề đầu tiên để bot hiểu được ý định của khách hàng!</p>
-                </td>
+                <td colspan="6" class="py-6 text-center text-slate-500">Chưa có chủ đề nào.</td>
             </tr>
             @endforelse
         </tbody>
@@ -102,97 +119,376 @@
 </div>
 
 {{-- Pagination --}}
-<div class="mt-4">
-    {{ $intents->links() }}
+@if($intents->hasPages())
+<div class="pagination mt-3">
+    {{ $intents->onEachSide(1)->links('pagination::tailwind') }}
 </div>
+@endif
 
-{{-- Modal --}}
-<div id="intentModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <form method="POST" action="{{ route('admin.bot.intents.store') }}" class="p-6">
+{{-- Modal với 4 Tabs --}}
+<div id="intentModal" class="modal hidden">
+    <div class="modal-card max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+        <form method="POST" action="{{ route('admin.bot.intents.store') }}" class="flex flex-col h-full" id="intentForm">
             @csrf
-            <div class="flex items-center justify-between mb-6">
-                <h3 class="text-xl font-bold text-slate-900">Thêm/Sửa chủ đề</h3>
-                <button type="button" onclick="document.getElementById('intentModal').classList.add('hidden')" 
-                    class="text-slate-400 hover:text-slate-600">
-                    <i class="fa-solid fa-xmark text-xl"></i>
+            <input type="hidden" name="id" id="intent_id">
+
+            {{-- Modal Header --}}
+            <div class="flex items-center justify-between px-4 py-3 border-b">
+                <h3 class="font-semibold" id="modal_title">Thêm chủ đề mới</h3>
+                <button type="button" onclick="closeModal()" class="btn btn-ghost btn-sm !p-1">
+                    <i class="fa-solid fa-xmark"></i>
                 </button>
             </div>
 
-            <div class="space-y-4">
-                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <div class="flex items-start gap-2">
-                        <i class="fa-solid fa-info-circle text-blue-600 mt-0.5"></i>
-                        <div class="text-sm text-blue-800">
-                            <strong>Hướng dẫn:</strong> Chủ đề là các ý định mà bot có thể hiểu. Ví dụ: Khi khách hỏi "Tìm sản phẩm cho da dầu" → Bot hiểu đây là chủ đề "Tìm sản phẩm"
+            {{-- Tabs Navigation --}}
+            <div class="flex border-b border-slate-200 bg-white px-5">
+                <button type="button" onclick="switchTab(1)" id="tab-btn-1"
+                    class="px-4 py-3 text-sm font-semibold border-b-2 border-rose-600 text-rose-600 transition">
+                    <i class="fa-solid fa-info-circle mr-1.5"></i> Thông tin cơ bản
+                </button>
+                <button type="button" onclick="switchTab(2)" id="tab-btn-2"
+                    class="px-4 py-3 text-sm font-semibold border-b-2 border-transparent text-slate-600 hover:text-rose-600 transition">
+                    <i class="fa-solid fa-list mr-1.5"></i> Examples
+                </button>
+                <button type="button" onclick="switchTab(3)" id="tab-btn-3"
+                    class="px-4 py-3 text-sm font-semibold border-b-2 border-transparent text-slate-600 hover:text-rose-600 transition">
+                    <i class="fa-solid fa-file-lines mr-1.5"></i> Response Template
+                </button>
+                <button type="button" onclick="switchTab(4)" id="tab-btn-4"
+                    class="px-4 py-3 text-sm font-semibold border-b-2 border-transparent text-slate-600 hover:text-rose-600 transition">
+                    <i class="fa-solid fa-cog mr-1.5"></i> Configuration
+                </button>
+            </div>
+
+            {{-- Modal Body với Tabs Content --}}
+            <div class="flex-1 overflow-hidden p-5 flex flex-col min-h-0">
+                {{-- Tab 1: Thông tin cơ bản --}}
+                <div id="tab-content-1" class="tab-content space-y-4 overflow-y-auto max-h-[calc(90vh-250px)] pr-2">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1.5">
+                            Tên hiển thị <span class="text-red-500">*</span>
+                        </label>
+                        <input type="text" name="display_name" id="intent_display_name" required
+                            placeholder="VD: Tìm sản phẩm"
+                            class="form-control">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1.5">
+                            Tên kỹ thuật (name) <span class="text-red-500">*</span>
+                        </label>
+                        <input type="text" name="name" id="intent_name" required
+                            placeholder="VD: product_search"
+                            class="form-control font-mono">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1.5">Mô tả</label>
+                        <textarea name="description" id="intent_description" rows="3"
+                            placeholder="VD: Khách hàng muốn tìm kiếm sản phẩm theo tiêu chí..."
+                            class="form-control"></textarea>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1.5">Độ ưu tiên (0-1000)</label>
+                            <input type="number" name="priority" id="intent_priority" value="0" min="0" max="1000"
+                                class="form-control">
+                        </div>
+                        <div class="flex items-center pt-7">
+                            <label class="flex items-center cursor-pointer">
+                                <input type="checkbox" name="is_active" id="intent_is_active" value="1" checked
+                                    class="w-4 h-4 text-rose-600 border-slate-300 rounded focus:ring-rose-500">
+                                <span class="ml-2 text-xs font-semibold text-slate-700">Kích hoạt</span>
+                            </label>
                         </div>
                     </div>
                 </div>
 
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">
-                        Tên hiển thị <span class="text-red-500">*</span>
-                    </label>
-                    <input type="text" name="display_name" id="intent_display_name" required
-                        placeholder="VD: Tìm sản phẩm"
-                        class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-rose-500">
-                    <p class="text-xs text-slate-500 mt-1">Tên dễ hiểu cho admin (không hiển thị cho khách hàng)</p>
+                {{-- Tab 2: Examples Management --}}
+                <div id="tab-content-2" class="tab-content hidden flex flex-col h-full max-h-[calc(90vh-250px)]">
+                    <div class="flex items-center justify-between mb-3 flex-shrink-0">
+                        <h4 class="text-sm font-semibold text-slate-900">Examples</h4>
+                        <button type="button" onclick="addExample()"
+                            class="px-3 py-1.5 bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition text-xs font-semibold flex items-center gap-1.5">
+                            <i class="fa-solid fa-plus text-xs"></i> Thêm example
+                        </button>
+                    </div>
+
+                    <div id="examples-container" class="space-y-2 overflow-y-auto flex-1 min-h-0 pr-2">
+                        <!-- Examples sẽ được thêm vào đây bằng JS -->
+                    </div>
                 </div>
 
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">
-                        Tên kỹ thuật (name) <span class="text-red-500">*</span>
-                    </label>
-                    <input type="text" name="name" id="intent_name" required
-                        placeholder="VD: product_search"
-                        class="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500">
-                    <p class="text-xs text-slate-500 mt-1">Tên kỹ thuật dùng trong code (không có dấu cách, VD: product_search, order_tracking)</p>
+                {{-- Tab 3: Response Template --}}
+                <div id="tab-content-3" class="tab-content hidden space-y-4 overflow-y-auto max-h-[calc(90vh-250px)] pr-2">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1.5">
+                            Template câu trả lời
+                        </label>
+                        <textarea name="response_template" id="intent_response_template" rows="12"
+                            placeholder="{greeting} Mình hiểu bạn đang {intent_description}!
+
+{if_has_entities}
+Dựa vào thông tin bạn cung cấp:
+- Loại da: {skin_types}
+- Ngân sách: {budget}
+{endif}
+
+{if_has_products}
+Mình gợi ý cho bạn {product_count} sản phẩm:
+{products_list}
+{endif}
+
+{if_no_products}
+Để mình tư vấn chính xác hơn, bạn có thể cho mình biết:
+{follow_up_questions}
+{endif}"
+                            class="form-control font-mono text-xs resize-none"></textarea>
+                        <p class="text-xs text-slate-500 mt-1.5">
+                            Variables: <code class="bg-slate-100 px-1 py-0.5 rounded">{skin_types}</code>, 
+                            <code class="bg-slate-100 px-1 py-0.5 rounded">{budget}</code>, 
+                            <code class="bg-slate-100 px-1 py-0.5 rounded">{products_list}</code>
+                        </p>
+                    </div>
                 </div>
 
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Mô tả</label>
-                    <textarea name="description" id="intent_description" rows="3"
-                        placeholder="VD: Khách hàng muốn tìm kiếm sản phẩm theo tiêu chí (loại da, ngân sách, vấn đề da...)"
-                        class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-rose-500"></textarea>
-                </div>
+                {{-- Tab 4: Configuration --}}
+                <div id="tab-content-4" class="tab-content hidden space-y-4 overflow-y-auto max-h-[calc(90vh-250px)] pr-2">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1.5">Required Entities</label>
+                            <div class="space-y-2">
+                                @php
+                                $entityOptions = ['skin_types', 'budget', 'product_type', 'concerns', 'ingredients'];
+                                @endphp
+                                @foreach($entityOptions as $entity)
+                                <label class="flex items-center gap-2">
+                                    <input type="checkbox" name="required_entities[]" value="{{ $entity }}"
+                                        class="w-4 h-4 text-rose-600 border-slate-300 rounded focus:ring-rose-500">
+                                    <span class="text-xs text-slate-700">{{ $entity }}</span>
+                                </label>
+                                @endforeach
+                            </div>
+                        </div>
 
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Độ ưu tiên (0-1000)</label>
-                    <input type="number" name="priority" id="intent_priority" value="0" min="0" max="1000"
-                        class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-rose-500">
-                    <p class="text-xs text-slate-500 mt-1">Số càng cao, bot càng ưu tiên hiểu chủ đề này trước (mặc định: 0)</p>
-                </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1.5">Optional Entities</label>
+                            <div class="space-y-2">
+                                @foreach($entityOptions as $entity)
+                                <label class="flex items-center gap-2">
+                                    <input type="checkbox" name="optional_entities[]" value="{{ $entity }}"
+                                        class="w-4 h-4 text-rose-600 border-slate-300 rounded focus:ring-rose-500">
+                                    <span class="text-xs text-slate-700">{{ $entity }}</span>
+                                </label>
+                                @endforeach
+                            </div>
+                        </div>
+                    </div>
 
-                <div class="flex items-center gap-4">
-                    <label class="flex items-center cursor-pointer">
-                        <input type="checkbox" name="is_active" id="intent_is_active" value="1" checked
-                            class="w-4 h-4 text-rose-600 border-slate-300 rounded focus:ring-rose-500">
-                        <span class="ml-2 text-sm text-slate-700">Kích hoạt chủ đề này</span>
-                    </label>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1.5">Tools Mapping</label>
+                        <div class="bg-slate-50 border border-slate-200 rounded-lg p-3 max-h-48 overflow-y-auto">
+                            <div class="space-y-2">
+                                @foreach($availableTools as $tool)
+                                <label class="flex items-center gap-2 cursor-pointer hover:bg-white p-2 rounded transition">
+                                    <input type="checkbox" name="tools[]" value="{{ $tool->name }}"
+                                        class="w-4 h-4 text-rose-600 border-slate-300 rounded focus:ring-rose-500">
+                                    <div class="flex-1">
+                                        <div class="text-xs font-semibold text-slate-900">{{ $tool->display_name }}</div>
+                                        <div class="text-xs text-slate-500 font-mono">{{ $tool->name }}</div>
+                                    </div>
+                                </label>
+                                @endforeach
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1.5">Follow-up Questions</label>
+                        <div id="follow-up-questions-container" class="space-y-2">
+                            <!-- Follow-up questions sẽ được thêm vào đây bằng JS -->
+                        </div>
+                        <button type="button" onclick="addFollowUpQuestion()"
+                            class="mt-2 px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition text-xs font-semibold">
+                            <i class="fa-solid fa-plus text-xs mr-1"></i> Thêm câu hỏi
+                        </button>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1.5">Confidence Threshold (0.0 - 1.0)</label>
+                        <input type="number" name="confidence_threshold" id="intent_confidence_threshold" 
+                            value="0.7" min="0" max="1" step="0.1"
+                            class="form-control">
+                    </div>
                 </div>
             </div>
 
-            <div class="mt-6 flex gap-3">
-                <button type="submit" class="flex-1 px-4 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition flex items-center justify-center gap-2">
+            {{-- Modal Footer --}}
+            <div class="flex gap-2 px-4 py-3 border-t">
+                <button type="submit" class="flex-1 btn btn-primary btn-sm" style="background: #e11d48 !important; border-color: #e11d48 !important; color: #fff !important;">
                     <i class="fa-solid fa-save"></i> Lưu
                 </button>
-                <button type="button" onclick="document.getElementById('intentModal').classList.add('hidden')" 
-                    class="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition">
-                    Hủy
-                </button>
+                <button type="button" onclick="closeModal()" class="btn btn-outline btn-sm">Hủy</button>
             </div>
         </form>
     </div>
 </div>
 
 <script>
-function editIntent(intent) {
-    document.getElementById('intent_name').value = intent.name;
-    document.getElementById('intent_display_name').value = intent.display_name;
-    document.getElementById('intent_description').value = intent.description || '';
-    document.getElementById('intent_priority').value = intent.priority || 0;
-    document.getElementById('intent_is_active').checked = intent.is_active;
-    document.getElementById('intentModal').classList.remove('hidden');
+let currentTab = 1;
+let exampleCount = 0;
+let followUpCount = 0;
+
+function switchTab(tabNum) {
+    for (let i = 1; i <= 4; i++) {
+        document.getElementById(`tab-content-${i}`).classList.add('hidden');
+        const btn = document.getElementById(`tab-btn-${i}`);
+        btn.classList.remove('border-rose-600', 'text-rose-600');
+        btn.classList.add('border-transparent', 'text-slate-600');
+    }
+    
+    document.getElementById(`tab-content-${tabNum}`).classList.remove('hidden');
+    const btn = document.getElementById(`tab-btn-${tabNum}`);
+    btn.classList.remove('border-transparent', 'text-slate-600');
+    btn.classList.add('border-rose-600', 'text-rose-600');
+    
+    currentTab = tabNum;
 }
+
+function resetForm() {
+    document.getElementById('intent_id').value = '';
+    document.getElementById('intent_display_name').value = '';
+    document.getElementById('intent_name').value = '';
+    document.getElementById('intent_description').value = '';
+    document.getElementById('intent_priority').value = '0';
+    document.getElementById('intent_is_active').checked = true;
+    document.getElementById('intent_response_template').value = '';
+    document.getElementById('intent_confidence_threshold').value = '0.7';
+    document.getElementById('modal_title').textContent = 'Thêm chủ đề mới';
+    
+    document.getElementById('examples-container').innerHTML = '';
+    exampleCount = 0;
+    
+    document.getElementById('follow-up-questions-container').innerHTML = '';
+    followUpCount = 0;
+    
+    document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+    document.getElementById('intent_is_active').checked = true;
+    
+    switchTab(1);
+}
+
+function openModal() {
+    resetForm();
+    document.getElementById('intentModal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeModal() {
+    document.getElementById('intentModal').classList.add('hidden');
+    document.body.style.overflow = '';
+}
+
+function editIntent(intent) {
+    if (typeof intent === 'string') {
+        try {
+            intent = JSON.parse(intent);
+        } catch (e) {
+            console.error('Failed to parse intent:', e);
+            return;
+        }
+    }
+    
+    document.getElementById('intent_id').value = intent.id || '';
+    document.getElementById('intent_display_name').value = intent.display_name || '';
+    document.getElementById('intent_name').value = intent.name || '';
+    document.getElementById('intent_description').value = intent.description || '';
+    document.getElementById('intent_priority').value = intent.priority ?? 0;
+    document.getElementById('intent_is_active').checked = intent.is_active !== undefined ? intent.is_active : true;
+    document.getElementById('modal_title').textContent = 'Sửa chủ đề: ' + (intent.display_name || '');
+    
+    const examples = intent.examples || [];
+    document.getElementById('examples-container').innerHTML = '';
+    exampleCount = 0;
+    examples.forEach(example => {
+        addExample(example);
+    });
+    
+    document.getElementById('intent_response_template').value = intent.config?.response_template || '';
+    
+    const config = intent.config || {};
+    
+    document.querySelectorAll('input[name="required_entities[]"]').forEach(cb => {
+        cb.checked = (config.required_entities || []).includes(cb.value);
+    });
+    
+    document.querySelectorAll('input[name="optional_entities[]"]').forEach(cb => {
+        cb.checked = (config.optional_entities || []).includes(cb.value);
+    });
+    
+    document.querySelectorAll('input[name="tools[]"]').forEach(cb => {
+        cb.checked = (config.tools || []).includes(cb.value);
+    });
+    
+    const followUps = config.follow_up_questions || [];
+    document.getElementById('follow-up-questions-container').innerHTML = '';
+    followUpCount = 0;
+    followUps.forEach(question => {
+        addFollowUpQuestion(question);
+    });
+    
+    document.getElementById('intent_confidence_threshold').value = config.confidence_threshold ?? 0.7;
+    
+    document.getElementById('intentModal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+    switchTab(1);
+}
+
+function addExample(value = '') {
+    exampleCount++;
+    const container = document.getElementById('examples-container');
+    const div = document.createElement('div');
+    div.className = 'flex items-center gap-2';
+    div.innerHTML = `
+        <input type="text" name="examples[]" value="${value.replace(/"/g, '&quot;')}" 
+            placeholder="VD: tìm serum cho da dầu"
+            class="form-control">
+        <button type="button" onclick="this.parentElement.remove()"
+            class="px-2.5 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition">
+            <i class="fa-solid fa-trash text-xs"></i>
+        </button>
+    `;
+    container.appendChild(div);
+}
+
+function addFollowUpQuestion(value = '') {
+    followUpCount++;
+    const container = document.getElementById('follow-up-questions-container');
+    const div = document.createElement('div');
+    div.className = 'flex items-center gap-2';
+    div.innerHTML = `
+        <input type="text" name="follow_up_questions[]" value="${value.replace(/"/g, '&quot;')}" 
+            placeholder="VD: Bạn có thể cho mình biết loại da của bạn không?"
+            class="form-control">
+        <button type="button" onclick="this.parentElement.remove()"
+            class="px-2.5 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition">
+            <i class="fa-solid fa-trash text-xs"></i>
+        </button>
+    `;
+    container.appendChild(div);
+}
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        closeModal();
+    }
+});
+
+document.getElementById('intentModal')?.addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeModal();
+    }
+});
 </script>
 @endsection

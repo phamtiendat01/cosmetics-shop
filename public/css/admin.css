@@ -87,13 +87,14 @@ body {
 }
 
 .btn-primary {
-    background: var(--primary);
-    border-color: var(--primary);
-    color: #fff !important
+    background: var(--primary) !important;
+    border-color: var(--primary) !important;
+    color: #fff !important;
 }
 
 .btn-primary:hover {
-    background: var(--primary-700);
+    background: var(--primary-700) !important;
+    border-color: var(--primary-700) !important;
     transform: translateY(-1px);
     box-shadow: 0 6px 18px rgba(225, 29, 72, .25)
 }

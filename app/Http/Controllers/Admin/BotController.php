@@ -61,7 +61,11 @@ class BotController extends Controller
     public function intents()
     {
         $intents = BotIntent::orderByDesc('priority')->orderBy('name')->paginate(20);
-        return view('admin.bot.intents', compact('intents'));
+        // Lấy tất cả tools để map với intents
+        $availableTools = BotTool::where('is_active', true)
+            ->orderBy('display_name')
+            ->get(['id', 'name', 'display_name', 'description']);
+        return view('admin.bot.intents', compact('intents', 'availableTools'));
     }
 
     /**
@@ -70,31 +74,61 @@ class BotController extends Controller
     public function intentStore(Request $request)
     {
         $validated = $request->validate([
+            'id' => 'nullable|integer|exists:bot_intents,id',
             'name' => 'required|string|max:255',
             'display_name' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'examples' => 'nullable|string',
+            'examples' => 'nullable|array',
+            'examples.*' => 'string|max:500',
             'handler_class' => 'nullable|string',
             'is_active' => 'boolean',
             'priority' => 'integer|min:0|max:1000',
-            'config' => 'nullable|string',
+            // Config fields
+            'response_template' => 'nullable|string',
+            'required_entities' => 'nullable|array',
+            'optional_entities' => 'nullable|array',
+            'follow_up_questions' => 'nullable|array',
+            'follow_up_questions.*' => 'string|max:500',
+            'tools' => 'nullable|array',
+            'tools.*' => 'string|exists:bot_tools,name',
+            'confidence_threshold' => 'nullable|numeric|min:0|max:1',
         ]);
 
-        // Parse JSON fields
-        if (isset($validated['examples']) && is_string($validated['examples'])) {
-            $validated['examples'] = json_decode($validated['examples'], true) ?? [];
-        }
-        if (isset($validated['config']) && is_string($validated['config'])) {
-            $validated['config'] = json_decode($validated['config'], true) ?? [];
-        }
-        $validated['is_active'] = $request->has('is_active');
+        // Build config
+        $config = [
+            'response_template' => $validated['response_template'] ?? null,
+            'required_entities' => $validated['required_entities'] ?? [],
+            'optional_entities' => $validated['optional_entities'] ?? [],
+            'follow_up_questions' => $validated['follow_up_questions'] ?? [],
+            'tools' => $validated['tools'] ?? [],
+            'confidence_threshold' => $validated['confidence_threshold'] ?? 0.7,
+        ];
 
-        BotIntent::updateOrCreate(
-            ['name' => $validated['name']],
-            $validated
-        );
+        $intentData = [
+            'name' => $validated['name'],
+            'display_name' => $validated['display_name'],
+            'description' => $validated['description'] ?? null,
+            'examples' => $validated['examples'] ?? [],
+            'handler_class' => $validated['handler_class'] ?? null,
+            'is_active' => $request->has('is_active'),
+            'priority' => $validated['priority'] ?? 0,
+            'config' => $config,
+        ];
 
-        return redirect()->route('admin.bot.intents')->with('success', 'Intent đã được lưu!');
+        if (isset($validated['id'])) {
+            $intent = BotIntent::findOrFail($validated['id']);
+            $intent->update($intentData);
+            $message = 'Intent đã được cập nhật!';
+        } else {
+            BotIntent::create($intentData);
+            $message = 'Intent đã được tạo!';
+        }
+
+        // Clear cache để bot nhận diện examples mới ngay lập tức
+        \Illuminate\Support\Facades\Cache::forget('bot.intents.active');
+        \Illuminate\Support\Facades\Cache::forget("bot.intent.{$validated['name']}");
+
+        return redirect()->route('admin.bot.intents')->with('success', $message);
     }
 
     /**
@@ -102,7 +136,13 @@ class BotController extends Controller
      */
     public function tools()
     {
-        $tools = BotTool::orderBy('order')
+        // Chỉ hiển thị các tools có question và answer (câu hỏi tự động)
+        // Ẩn các tools kỹ thuật không có question/answer
+        $tools = BotTool::whereNotNull('question')
+            ->where('question', '!=', '')
+            ->whereNotNull('answer')
+            ->where('answer', '!=', '')
+            ->orderBy('order')
             ->orderBy('category')
             ->orderBy('display_name')
             ->paginate(20);
@@ -158,6 +198,15 @@ class BotController extends Controller
         }
 
         return redirect()->route('admin.bot.tools')->with('success', 'Câu hỏi tự động đã được lưu!');
+    }
+
+    /**
+     * Xóa Tool
+     */
+    public function toolDestroy(BotTool $tool)
+    {
+        $tool->delete();
+        return redirect()->route('admin.bot.tools')->with('success', 'Câu hỏi tự động đã được xóa!');
     }
 
     /**

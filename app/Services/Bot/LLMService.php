@@ -58,11 +58,23 @@ class LLMService
             $ragResults = [];
             $ragContext = '';
             try {
+                Log::info('LLMService: Calling RAGService::retrieve', [
+                    'query' => substr($message, 0, 100),
+                    'has_context' => !empty($context),
+                ]);
                 $ragResults = $this->ragService->retrieve($message, $context, 5);
                 $ragContext = $this->ragService->buildContextString($ragResults);
+
+                Log::info('LLMService: RAG retrieval completed', [
+                    'products_count' => count($ragResults['products'] ?? []),
+                    'policies_count' => count($ragResults['policies'] ?? []),
+                    'faqs_count' => count($ragResults['faqs'] ?? []),
+                    'rag_context_length' => strlen($ragContext),
+                ]);
             } catch (\Throwable $e) {
                 Log::warning('RAG retrieval failed, continuing without RAG', [
                     'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
                 ]);
                 // Continue without RAG if it fails
             }
@@ -219,7 +231,105 @@ class LLMService
                 "1. Chào lại thân thiện\n" .
                 "2. Giới thiệu ngắn gọn về khả năng của bot\n" .
                 "3. Hỏi user cần hỗ trợ gì\n",
+            'add_to_cart' => "**Khi user muốn đặt hàng:**\n" .
+                "1. Nếu có addToCart từ tools result và success = true → SỬ DỤNG message từ tool result (KHÔNG tự generate)\n" .
+                "2. Nếu có getUserCoupons từ tools result → list ra các mã giảm giá và hỏi user có muốn áp không\n" .
+                "3. Nếu không có mã giảm giá → hỏi 'Bạn có muốn áp mã giảm giá không? (Bạn chưa có mã giảm giá nào. Bạn có thể bỏ qua bước này.)'\n" .
+                "4. Nếu addToCart success = false → thông báo lỗi từ message của tool\n" .
+                "5. Nếu cần đăng nhập → hướng dẫn đăng nhập\n" .
+                "6. Nếu không tìm thấy sản phẩm → hỏi lại hoặc gợi ý sản phẩm khác\n" .
+                "**QUAN TRỌNG:** Nếu có addToCart['message'] từ tools result → ƯU TIÊN dùng message đó, chỉ thêm câu hỏi về mã giảm giá nếu có.\n",
+            'checkout_init' => "**Khi user muốn thanh toán:**\n" .
+                "1. NHẮC LẠI yêu cầu thanh toán\n" .
+                "2. Kiểm tra giỏ hàng (nếu có từ tools result)\n" .
+                "3. Hướng dẫn user:\n" .
+                "   - Nếu chưa đăng nhập: 'Bạn cần đăng nhập để thanh toán. Vui lòng đăng nhập tại [link]'\n" .
+                "   - Nếu đã đăng nhập: 'Bạn có thể thanh toán tại [link checkout] hoặc mình sẽ hướng dẫn bạn điền thông tin'\n" .
+                "4. Nếu user muốn điền thông tin qua chat → hướng dẫn từng bước (tên, SĐT, địa chỉ, phương thức thanh toán)\n" .
+                "5. Kết thúc bằng link checkout hoặc hướng dẫn tiếp theo\n",
+            'checkout_coupon_response' => "**BẠN ĐANG TRONG QUY TRÌNH ĐẶT HÀNG - Bước 2:**\n" .
+                "User đang trả lời về mã giảm giá. Nếu có coupons từ tools result → list ra và hướng dẫn user chọn (số 1, số 2...).\n" .
+                "Nếu user nói 'không' hoặc 'bỏ qua' → chuyển sang bước tiếp theo (hỏi địa chỉ).\n" .
+                "Nếu user chọn mã → xác nhận đã áp mã và chuyển sang bước tiếp theo.\n",
+            'checkout_skip_coupon' => "**BẠN ĐANG TRONG QUY TRÌNH ĐẶT HÀNG - Bước 2:**\n" .
+                "User đã chọn bỏ qua mã giảm giá. Bạn CẦN chuyển sang bước tiếp theo: 'Bạn muốn giao hàng đến địa chỉ nào?'\n" .
+                "Nếu có addresses từ tools result → list ra. Nếu không có → hướng dẫn user nhập địa chỉ mới.\n",
+            'checkout_apply_coupon' => "**BẠN ĐANG TRONG QUY TRÌNH ĐẶT HÀNG - Bước 2:**\n" .
+                "User đã chọn mã giảm giá. Nếu applyCoupon từ tools result có success = true → xác nhận đã áp mã và số tiền giảm.\n" .
+                "Sau đó chuyển sang bước tiếp theo: 'Bạn muốn giao hàng đến địa chỉ nào?'\n",
+            'checkout_select_address' => "**BẠN ĐANG TRONG QUY TRÌNH ĐẶT HÀNG - Bước 3:**\n" .
+                "User đã chọn địa chỉ. Nếu calculateShipping từ tools result có success = true → xác nhận địa chỉ và phí ship.\n" .
+                "Sau đó chuyển sang bước tiếp theo: 'Bạn có muốn áp mã vận chuyển không?'\n",
+            'checkout_skip_shipping_voucher' => "**BẠN ĐANG TRONG QUY TRÌNH ĐẶT HÀNG - Bước 4:**\n" .
+                "User đã chọn bỏ qua mã vận chuyển. Bạn CẦN:\n" .
+                "1. Tóm tắt đơn hàng: Tổng sản phẩm, Giảm giá, Phí ship, Tổng cộng\n" .
+                "2. Hỏi: 'Bạn muốn thanh toán bằng phương thức nào?'\n" .
+                "3. List payment methods từ tools result.\n",
+            'checkout_apply_shipping_voucher' => "**BẠN ĐANG TRONG QUY TRÌNH ĐẶT HÀNG - Bước 4:**\n" .
+                "User đã chọn mã vận chuyển. Nếu applyShippingVoucher từ tools result có success = true → xác nhận đã áp mã và số tiền giảm.\n" .
+                "Sau đó:\n" .
+                "1. Tóm tắt đơn hàng: Tổng sản phẩm, Giảm giá, Phí ship, Giảm phí ship, Tổng cộng\n" .
+                "2. Hỏi: 'Bạn muốn thanh toán bằng phương thức nào?'\n" .
+                "3. List payment methods từ tools result.\n",
+            'checkout_shipping_voucher_response' => "**BẠN ĐANG TRONG QUY TRÌNH ĐẶT HÀNG - Bước 4:**\n" .
+                "User đang trả lời về mã vận chuyển. Nếu có vouchers từ tools result → list ra và hướng dẫn user chọn.\n" .
+                "Nếu user nói 'không' hoặc 'bỏ qua' → chuyển sang bước tiếp theo (hỏi phương thức thanh toán).\n",
+            'checkout_select_payment' => "**BẠN ĐANG TRONG QUY TRÌNH ĐẶT HÀNG - Bước 5:**\n" .
+                "User đã chọn phương thức thanh toán. Bạn CẦN:\n" .
+                "1. Xác nhận phương thức thanh toán user đã chọn\n" .
+                "2. Tóm tắt lại toàn bộ đơn hàng: Sản phẩm, Giảm giá, Phí ship, Tổng cộng\n" .
+                "3. Nếu có placeOrder từ tools result và success = true → hiển thị thông báo đặt hàng thành công với mã đơn hàng\n" .
+                "4. Nếu chưa có placeOrder → tự động đặt hàng (tools sẽ tự động chạy)\n",
+            'checkout_shipping_voucher_asked' => "**Khi đã hỏi về mã vận chuyển:**\n" .
+                "1. NHẮC LẠI: 'Bạn có muốn áp mã vận chuyển không?'\n" .
+                "2. Nếu có shipping vouchers từ tools → list ra cho user chọn (số 1, số 2...)\n" .
+                "3. Nếu không có vouchers → nói 'Bạn chưa có mã vận chuyển nào. Bạn có thể bỏ qua bước này.'\n" .
+                "4. Hướng dẫn: 'Bạn muốn áp mã nào? (Nói \"mã X\" hoặc \"số 1\", \"số 2\"...) Hoặc nói \"không\" nếu không muốn áp mã.'\n",
+            'checkout_payment_method_asked' => "**Khi đã hỏi về phương thức thanh toán:**\n" .
+                "1. NHẮC LẠI tổng tiền đơn hàng (sau khi giảm giá và phí ship)\n" .
+                "2. Nếu có payment methods từ tools → list ra cho user chọn\n" .
+                "3. Hướng dẫn: 'Bạn muốn thanh toán bằng cách nào? (Nói \"COD\", \"VietQR\", \"số 1\"...)'\n",
         ];
+
+        // ✅ Checkout flow instructions
+        $checkoutState = $context['checkout_state'] ?? null;
+        if ($checkoutState) {
+            $checkoutInstructions = [
+                'cart_added' => "**BẠN ĐANG TRONG QUY TRÌNH ĐẶT HÀNG - Bước 1:**\n" .
+                    "User vừa thêm sản phẩm vào giỏ hàng. Bạn CẦN hỏi: 'Bạn có muốn áp mã giảm giá không?'\n" .
+                    "Nếu có coupons từ tools result → list ra. Nếu không có → nói 'Bạn chưa có mã giảm giá nào. Bạn có thể bỏ qua bước này.'\n",
+                'coupon_asked' => "**BẠN ĐANG TRONG QUY TRÌNH ĐẶT HÀNG - Bước 2:**\n" .
+                    "Bạn đã hỏi về mã giảm giá. Nếu có coupons từ tools result → list ra và hướng dẫn user chọn.\n" .
+                    "Nếu user nói 'không' hoặc 'bỏ qua' → chuyển sang bước tiếp theo (hỏi địa chỉ).\n",
+                'coupon_applied' => "**BẠN ĐANG TRONG QUY TRÌNH ĐẶT HÀNG - Bước 3:**\n" .
+                    "Đã xử lý mã giảm giá (áp dụng hoặc bỏ qua). Bạn CẦN hỏi: 'Bạn muốn giao hàng đến địa chỉ nào?'\n" .
+                    "Nếu có addresses từ tools result → list ra. Nếu không có → hướng dẫn user nhập địa chỉ mới.\n",
+                'address_asked' => "**BẠN ĐANG TRONG QUY TRÌNH ĐẶT HÀNG - Bước 4:**\n" .
+                    "Bạn đã hỏi về địa chỉ. Nếu có addresses từ tools result → list ra và hướng dẫn user chọn.\n" .
+                    "Sau khi user chọn địa chỉ → tính phí ship và xác nhận.\n",
+                'address_confirmed' => "**BẠN ĐANG TRONG QUY TRÌNH ĐẶT HÀNG - Bước 5:**\n" .
+                    "Đã xác nhận địa chỉ và tính phí ship. Bạn CẦN hỏi: 'Bạn có muốn áp mã vận chuyển không?'\n" .
+                    "Nếu có shipping vouchers từ tools result → list ra. Nếu không có → nói 'Bạn chưa có mã vận chuyển nào. Bạn có thể bỏ qua bước này.'\n",
+                'shipping_voucher_asked' => "**BẠN ĐANG TRONG QUY TRÌNH ĐẶT HÀNG - Bước 6:**\n" .
+                    "Bạn đã hỏi về mã vận chuyển. Nếu có vouchers từ tools result → list ra và hướng dẫn user chọn.\n" .
+                    "Nếu user nói 'không' hoặc 'bỏ qua' → chuyển sang bước tiếp theo (hỏi phương thức thanh toán).\n",
+                'shipping_voucher_applied' => "**BẠN ĐANG TRONG QUY TRÌNH ĐẶT HÀNG - Bước 7:**\n" .
+                    "Đã xử lý mã vận chuyển (áp dụng hoặc bỏ qua). Bạn CẦN:\n" .
+                    "1. Tóm tắt đơn hàng: Tổng sản phẩm, Giảm giá, Phí ship, Tổng cộng\n" .
+                    "2. Hỏi: 'Bạn muốn thanh toán bằng phương thức nào?'\n" .
+                    "3. List payment methods từ tools result.\n",
+                'payment_method_asked' => "**BẠN ĐANG TRONG QUY TRÌNH ĐẶT HÀNG - Bước 8:**\n" .
+                    "Bạn đã hỏi về phương thức thanh toán. Nếu có payment methods từ tools result → list ra và hướng dẫn user chọn.\n" .
+                    "Sau khi user chọn → xác nhận và đặt hàng.\n",
+                'payment_method_selected' => "**BẠN ĐANG TRONG QUY TRÌNH ĐẶT HÀNG - Bước 9:**\n" .
+                    "User đã chọn phương thức thanh toán. Bạn CẦN xác nhận và đặt hàng.\n" .
+                    "Nếu có placeOrder result → hiển thị thông báo đặt hàng thành công với mã đơn hàng.\n",
+            ];
+
+            if (isset($checkoutInstructions[$checkoutState])) {
+                $prompt .= $checkoutInstructions[$checkoutState] . "\n";
+            }
+        }
 
         $prompt .= "**QUY TẮC TRẢ LỜI (QUAN TRỌNG):**\n";
         $prompt .= "- Trả lời TỰ NHIÊN, LIỀN MẠCH như đang chat với bạn thân, không cứng nhắc\n";
@@ -233,7 +343,8 @@ class LLMService
         $prompt .= "- Nếu thiếu thông tin → hỏi rõ thêm (loại da, ngân sách, vấn đề da...) một cách tự nhiên\n";
         $prompt .= "- **TẠO HỘI THOẠI LIỀN MẠCH**: Kết thúc bằng câu hỏi hoặc gợi ý để tiếp tục hội thoại, không để cuộc trò chuyện bị ngắt quãng\n";
         $prompt .= "- **SỬ DỤNG EMOJI MỘT CÁCH HỢP LÝ**: Dùng emoji để tạo cảm giác thân thiện (VD: ✨, 😊, 💡) nhưng không quá nhiều\n";
-        $prompt .= "- **TRÁNH LẶP LẠI**: Nếu đã trả lời câu hỏi tương tự trước đó, tham khảo lại và trả lời ngắn gọn hơn\n\n";
+        $prompt .= "- **TRÁNH LẶP LẠI**: Nếu đã trả lời câu hỏi tương tự trước đó, tham khảo lại và trả lời ngắn gọn hơn\n";
+        $prompt .= "- **CHECKOUT FLOW**: Nếu đang trong quy trình đặt hàng, LUÔN hỏi bước tiếp theo sau mỗi bước hoàn thành\n\n";
 
         // Add intent-specific instructions
         if (isset($intentInstructions[$intent])) {
@@ -286,6 +397,14 @@ class LLMService
                     if ($productCount > 5) {
                         $prompt .= "  ... và " . ($productCount - 5) . " sản phẩm khác\n";
                     }
+                } elseif ($toolName === 'addToCart' && is_array($result)) {
+                    // ✅ Format đặc biệt cho addToCart result
+                    $success = $result['success'] ?? false;
+                    $message = $result['message'] ?? '';
+                    $productName = $result['product_name'] ?? '';
+                    $cartCount = $result['cart_count'] ?? 0;
+                    $prompt .= "- {$toolName}: success={$success}, message=\"{$message}\", product_name=\"{$productName}\", cart_count={$cartCount}\n";
+                    $prompt .= "  **QUAN TRỌNG:** Nếu success=true, BẮT BUỘC sử dụng message từ tool result này, KHÔNG tự generate!\n";
                 } else {
                     $prompt .= "- {$toolName}: " . json_encode($result, JSON_UNESCAPED_UNICODE) . "\n";
                 }

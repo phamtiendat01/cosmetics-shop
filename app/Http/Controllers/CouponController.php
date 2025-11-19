@@ -204,7 +204,7 @@ class CouponController extends Controller
      * Build giỏ hàng từ session.
      * @param array|null $onlyKeys Nếu truyền, chỉ lấy các items có key trong danh sách này.
      */
-    private function buildCart(array $onlyKeys = null): array
+    public function buildCart(array $onlyKeys = null): array
     {
         // ['rowKey' => ['product_id'=>..,'variant_id'=>..,'qty'=>..], ...]
         $raw = session('cart.items', []);

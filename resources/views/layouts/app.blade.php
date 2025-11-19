@@ -45,6 +45,16 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
+    {{-- Modern Animation Libraries 2025 --}}
+    {{-- GSAP 3.12 - Professional Animation Library --}}
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+    
+    {{-- Lottie - Rich Animations --}}
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js"></script>
+    
+    {{-- Intersection Observer Polyfill (for older browsers) --}}
+    <script src="https://cdn.jsdelivr.net/npm/intersection-observer@0.12.2/intersection-observer.min.js"></script>
+
     <style>
         .no-scrollbar::-webkit-scrollbar {
             display: none
@@ -476,13 +486,26 @@ $topCats = ($megaTree->count() ? $megaTree : $headerCats)->take(6);
                 </ul>
             </div>
             <div>
-                <h4 class="font-semibold mb-3">Liên hệ</h4>
-                <p class="text-ink/80">Hotline: 1900 1234</p>
-                <p class="text-ink/80">Email: support@cosme.house</p>
-                <div class="flex gap-3 mt-3 text-lg">
-                    <a href="#" class="hover:text-brand-600"><i class="fa-brands fa-facebook"></i></a>
-                    <a href="#" class="hover:text-brand-600"><i class="fa-brands fa-instagram"></i></a>
-                    <a href="#" class="hover:text-brand-600"><i class="fa-brands fa-tiktok"></i></a>
+                <h4 class="font-semibold mb-3 flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-full border-2 border-rose-500/30 bg-gradient-to-br from-rose-50 to-pink-50 flex items-center justify-center">
+                        <i class="fa-solid fa-headset text-rose-600 text-sm"></i>
+                    </div>
+                    <span>Thông tin liên hệ</span>
+                </h4>
+                <div class="space-y-2 text-ink/80">
+                    <p class="flex items-center gap-2">
+                        <i class="fa-solid fa-phone text-rose-600 text-xs"></i>
+                        <span>Hotline: <a href="tel:19001234" class="hover:text-brand-600 font-medium">1900 1234</a> (8:00 - 22:00)</span>
+                    </p>
+                    <p class="flex items-center gap-2">
+                        <i class="fa-solid fa-envelope text-rose-600 text-xs"></i>
+                        <span>Email: <a href="mailto:support@cosme.house" class="hover:text-brand-600">support@cosme.house</a></span>
+                    </p>
+                </div>
+                <div class="flex gap-3 mt-4 text-lg">
+                    <a href="#" class="w-9 h-9 rounded-full bg-slate-100 hover:bg-rose-100 flex items-center justify-center text-slate-600 hover:text-rose-600 transition"><i class="fa-brands fa-facebook"></i></a>
+                    <a href="#" class="w-9 h-9 rounded-full bg-slate-100 hover:bg-rose-100 flex items-center justify-center text-slate-600 hover:text-rose-600 transition"><i class="fa-brands fa-instagram"></i></a>
+                    <a href="#" class="w-9 h-9 rounded-full bg-slate-100 hover:bg-rose-100 flex items-center justify-center text-slate-600 hover:text-rose-600 transition"><i class="fa-brands fa-tiktok"></i></a>
                 </div>
             </div>
             <div>

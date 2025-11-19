@@ -2,89 +2,96 @@
 @section('title', 'CosmeBot - Hội thoại')
 
 @section('content')
-<div class="mb-6">
-    <h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">
-        <i class="fa-solid fa-comments text-rose-600"></i>
-        Hội thoại
-    </h1>
-    <p class="text-slate-600 mt-1">Xem lịch sử hội thoại với chatbot</p>
+<style>
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+</style>
+
+@if(session('ok'))
+<div class="alert alert-success mb-3" data-auto-dismiss="3000">{{ session('ok') }}</div>
+@endif
+
+<div class="toolbar">
+    <div class="toolbar-title">Hội thoại</div>
+    <div class="toolbar-actions"></div>
 </div>
 
 {{-- Filters --}}
-<div class="bg-white border border-slate-200 rounded-xl p-4 mb-6">
-    <form method="GET" class="flex gap-4 items-end">
-        <div class="flex-1">
-            <label class="block text-sm font-medium text-slate-700 mb-1">Tìm kiếm</label>
-            <input type="text" name="search" value="{{ request('search') }}" placeholder="Session ID, tên user..."
-                class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-rose-500">
+<div class="card p-3 mb-3">
+    <form method="GET" class="grid md:grid-cols-3 gap-2 items-end">
+        <div>
+            <input type="text" name="search" value="{{ request('search') }}" placeholder="Session ID, tên user..." class="form-control">
         </div>
         <div>
-            <label class="block text-sm font-medium text-slate-700 mb-1">Trạng thái</label>
-            <select name="status" class="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-rose-500">
-                <option value="">Tất cả</option>
+            <select name="status" class="form-control" id="statusSelect">
+                <option value="">Tất cả trạng thái</option>
                 <option value="active" {{ request('status') === 'active' ? 'selected' : '' }}>Đang hoạt động</option>
                 <option value="completed" {{ request('status') === 'completed' ? 'selected' : '' }}>Hoàn tất</option>
                 <option value="abandoned" {{ request('status') === 'abandoned' ? 'selected' : '' }}>Bỏ dở</option>
             </select>
         </div>
-        <button type="submit" class="px-4 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition">
-            <i class="fa-solid fa-search mr-2"></i> Tìm
-        </button>
+        <div class="flex gap-2">
+            <button type="submit" class="btn btn-soft btn-sm">Lọc</button>
+            <a href="{{ route('admin.bot.conversations') }}" class="btn btn-outline btn-sm">Reset</a>
+        </div>
     </form>
 </div>
 
 {{-- Table --}}
-<div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-    <table class="w-full">
-        <thead class="bg-slate-50 border-b border-slate-200">
+<div class="card table-wrap p-0">
+    <table class="table-admin">
+        <thead>
             <tr>
-                <th class="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase">ID</th>
-                <th class="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase">User</th>
-                <th class="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase">Session</th>
-                <th class="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase">Số tin nhắn</th>
-                <th class="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase">Trạng thái</th>
-                <th class="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase">Cập nhật</th>
-                <th class="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase">Thao tác</th>
+                <th>ID</th>
+                <th>User</th>
+                <th>Session</th>
+                <th>Số tin nhắn</th>
+                <th>Trạng thái</th>
+                <th>Cập nhật</th>
+                <th class="col-actions">Thao tác</th>
             </tr>
         </thead>
-        <tbody class="divide-y divide-slate-200">
-            @forelse($conversations as $conv)
-            <tr class="hover:bg-slate-50">
-                <td class="px-6 py-4 text-slate-900">#{{ $conv->id }}</td>
-                <td class="px-6 py-4">
+        <tbody>
+            @forelse($conversations as $index => $conv)
+            <tr style="animation: fadeInUp 0.3s ease-out {{ 0.1 + ($index * 0.03) }}s backwards;">
+                <td>#{{ $conv->id }}</td>
+                <td>
                     @if($conv->user)
-                    <div class="font-medium text-slate-900">{{ $conv->user->name }}</div>
+                    <div class="font-medium">{{ $conv->user->name }}</div>
                     <div class="text-xs text-slate-500">{{ $conv->user->email }}</div>
                     @else
                     <span class="text-slate-400">Guest</span>
                     @endif
                 </td>
-                <td class="px-6 py-4">
-                    <code class="text-xs bg-slate-100 px-2 py-1 rounded">{{ Str::limit($conv->session_id, 20) }}</code>
+                <td>
+                    <code class="text-xs bg-slate-100 px-1.5 py-0.5 rounded">{{ Str::limit($conv->session_id, 20) }}</code>
                 </td>
-                <td class="px-6 py-4 text-slate-900">{{ $conv->messages_count ?? 0 }}</td>
-                <td class="px-6 py-4">
+                <td>{{ $conv->messages_count ?? 0 }}</td>
+                <td>
                     @if($conv->status === 'active')
-                    <span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-semibold">Đang hoạt động</span>
+                    <span class="badge badge-green"><span class="badge-dot"></span>Đang hoạt động</span>
                     @elseif($conv->status === 'completed')
-                    <span class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-semibold">Hoàn tất</span>
+                    <span class="badge"><span class="badge-dot"></span>Hoàn tất</span>
                     @else
-                    <span class="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs font-semibold">Bỏ dở</span>
+                    <span class="badge badge-red"><span class="badge-dot"></span>Bỏ dở</span>
                     @endif
                 </td>
-                <td class="px-6 py-4 text-sm text-slate-600">{{ $conv->updated_at->format('d/m/Y H:i') }}</td>
-                <td class="px-6 py-4">
-                    <a href="{{ route('admin.bot.conversation', $conv) }}" 
-                        class="text-blue-600 hover:text-blue-700 text-sm font-medium">
-                        <i class="fa-solid fa-eye mr-1"></i> Xem
-                    </a>
+                <td>{{ $conv->updated_at->format('d/m/Y H:i') }}</td>
+                <td class="col-actions">
+                    <a href="{{ route('admin.bot.conversation', $conv) }}" class="btn btn-table btn-outline">Xem</a>
                 </td>
             </tr>
             @empty
             <tr>
-                <td colspan="7" class="px-6 py-8 text-center text-slate-500">
-                    Chưa có hội thoại nào.
-                </td>
+                <td colspan="7" class="py-6 text-center text-slate-500">Chưa có hội thoại nào.</td>
             </tr>
             @endforelse
         </tbody>
@@ -92,8 +99,8 @@
 </div>
 
 {{-- Pagination --}}
-<div class="mt-4">
-    {{ $conversations->links() }}
+<div class="pagination mt-3">
+    {{ $conversations->onEachSide(1)->links('pagination::tailwind') }}
 </div>
 @endsection
 

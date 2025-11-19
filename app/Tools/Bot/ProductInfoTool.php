@@ -72,14 +72,48 @@ class ProductInfoTool
     
     private function extractProductIdentifier(string $message, array $context): ?string
     {
-        // Check context có last_product không
+        // 1. Check product_index (sản phẩm thứ nhất, thứ hai...) - ƯU TIÊN CAO NHẤT
+        if (!empty($context['entities']['product_index']) && !empty($context['last_products'])) {
+            $index = $context['entities']['product_index'] - 1; // Convert to 0-based
+            if (isset($context['last_products'][$index])) {
+                $product = $context['last_products'][$index];
+                // Extract slug từ URL hoặc dùng name để tìm
+                if (!empty($product['url'])) {
+                    // URL format: /products/slug hoặc /p/slug
+                    if (preg_match('/\/(?:products|p)\/([^\/]+)/', $product['url'], $m)) {
+                        return $m[1];
+                    }
+                }
+                // Nếu có name, tìm product theo name
+                if (!empty($product['name'])) {
+                    $found = Product::where('is_active', 1)
+                        ->where('name', $product['name'])
+                        ->first(['id', 'slug']);
+                    if ($found) {
+                        return $found->slug ?? $found->id;
+                    }
+                }
+            }
+        }
+        
+        // 2. Check context có last_product không
         if (!empty($context['entities']['last_product'])) {
             return $context['entities']['last_product'];
         }
         
-        // Extract từ message (đơn giản - có thể cải thiện)
+        // 3. Check product_name từ context
+        if (!empty($context['entities']['product_name'])) {
+            $found = Product::where('is_active', 1)
+                ->where('name', $context['entities']['product_name'])
+                ->first(['id', 'slug']);
+            if ($found) {
+                return $found->slug ?? $found->id;
+            }
+        }
+        
+        // 4. Extract từ message (đơn giản - có thể cải thiện)
         $words = explode(' ', Str::lower($message));
-        $stopwords = ['sản phẩm', 'món', 'cái', 'loại', 'cho', 'mình', 'bạn', 'giá', 'bao nhiêu'];
+        $stopwords = ['sản phẩm', 'món', 'cái', 'loại', 'cho', 'mình', 'bạn', 'giá', 'bao nhiêu', 'thứ', 'số', 'đầu tiên', 'nhất', 'hai', 'ba', 'bốn', 'năm'];
         $words = array_filter($words, fn($w) => !in_array($w, $stopwords) && mb_strlen($w) >= 3);
         
         if (empty($words)) {

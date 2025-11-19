@@ -17,7 +17,6 @@ use App\Http\Controllers\SpinController;
 use App\Http\Controllers\ShippingVoucherController; // ⟵ thêm dòng này
 use App\Http\Controllers\PayOSCheckoutController;
 use App\Http\Controllers\PayOSWebhookController;
-use App\Http\Controllers\Api\ProductTryOnController;
 use App\Http\Controllers\SkinTestController; // ⟵ thêm dòng này
 use App\Http\Controllers\LiveChatController;
 use App\Http\Controllers\Auth\GoogleAuthController;
@@ -112,11 +111,6 @@ Route::post('/p/{product}/reviews', [ProductReviewController::class, 'store'])->
 
 // Giỏ hàng (trang + API session)
 Route::get('/cart', fn() => view('cart.index'))->name('cart.index');
-// Try-on API
-Route::get('/products/{product}/tryon/shades', [ProductTryOnController::class, 'shades']);
-Route::get('/tryon/assets', [ProductTryOnController::class, 'assets']);
-Route::post('/tryon/sessions', [ProductTryOnController::class, 'storeSession'])->middleware('throttle:60,1');
-//
 Route::get('/livechat', [LiveChatController::class, 'index'])->name('livechat.index');   // UI shell
 Route::get('/livechat/{chat}', [LiveChatController::class, 'show'])->name('livechat.show'); // UI shell (open chatId)
 
@@ -416,6 +410,8 @@ Route::middleware(['auth', 'role:super-admin|admin|staff'])
                     ->name('tools');
                 Route::post('tools', [\App\Http\Controllers\Admin\BotController::class, 'toolStore'])
                     ->name('tools.store');
+                Route::delete('tools/{tool}', [\App\Http\Controllers\Admin\BotController::class, 'toolDestroy'])
+                    ->name('tools.destroy');
                 Route::get('conversations', [\App\Http\Controllers\Admin\BotController::class, 'conversations'])
                     ->name('conversations');
                 Route::get('conversations/{conversation}', [\App\Http\Controllers\Admin\BotController::class, 'conversation'])

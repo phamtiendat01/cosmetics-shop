@@ -1,0 +1,277 @@
+<?php
+
+namespace Database\Seeders;
+
+use App\Models\BotIntent;
+use Illuminate\Database\Seeder;
+
+/**
+ * Seeder đầy đủ cho Intents với examples và response templates
+ */
+class BotIntentsCompleteSeeder extends Seeder
+{
+    public function run(): void
+    {
+        $intents = [
+            [
+                'name' => 'greeting',
+                'display_name' => 'Chào hỏi',
+                'description' => 'Khách hàng chào hỏi bot',
+                'examples' => [
+                    'xin chào',
+                    'chào bạn',
+                    'hello',
+                    'hi',
+                    'hey',
+                    'chào bot',
+                    'xin chào bot',
+                    'alo',
+                    'chào',
+                    'chào shop',
+                ],
+                'priority' => 100,
+                'is_active' => true,
+                'config' => [
+                    'response_template' => "Xin chào! 👋 Mình là CosmeBot, trợ lý tư vấn mỹ phẩm của Cosme House.\n\nMình có thể giúp bạn:\n- Tìm sản phẩm phù hợp với loại da và ngân sách\n- Tra cứu đơn hàng\n- Hỏi về chính sách (ship, đổi trả, thanh toán)\n\nBạn cần mình hỗ trợ gì hôm nay? 😊",
+                    'tools' => [],
+                    'required_entities' => [],
+                    'optional_entities' => [],
+                    'follow_up_questions' => [],
+                    'confidence_threshold' => 0.7,
+                ],
+            ],
+            [
+                'name' => 'product_search',
+                'display_name' => 'Tìm kiếm sản phẩm',
+                'description' => 'Khách hàng muốn tìm kiếm sản phẩm',
+                'examples' => [
+                    'tìm serum cho da dầu',
+                    'cho mình xem kem dưỡng',
+                    'gợi ý sản phẩm chống nắng',
+                    'mình cần sữa rửa mặt',
+                    'tìm sản phẩm dưới 500k',
+                    'serum nào tốt cho da nhạy cảm',
+                    'tìm kem dưỡng ẩm',
+                    'cho mình xem toner',
+                    'tìm sản phẩm cho da mụn',
+                    'gợi ý serum vitamin c',
+                    'tìm cleanser cho da dầu',
+                    'mình muốn mua kem chống nắng',
+                    'tìm sản phẩm trị thâm',
+                    'cho mình xem mặt nạ',
+                    'tìm sản phẩm dưỡng ẩm',
+                    'gợi ý sản phẩm cho da khô',
+                    'tìm essence',
+                    'mình cần serum',
+                    // Examples phức tạp - nhiều điều kiện
+                    'tôi muốn tìm sản phẩm sữa rửa mặt cho da dầu tài chính dưới 500K',
+                    'tìm sữa rửa mặt cho da dầu dưới 500k',
+                    'mình cần sữa rửa mặt cho da dầu giá dưới 500k',
+                    'gợi ý sữa rửa mặt da dầu dưới 500 nghìn',
+                    'tìm serum cho da nhạy cảm giá khoảng 300-500k',
+                    'mình muốn tìm kem chống nắng cho da dầu dưới 400k',
+                    'tìm sản phẩm dưỡng ẩm cho da khô giá dưới 600k',
+                    'gợi ý toner cho da mụn dưới 500k',
+                    'tìm sản phẩm trị mụn cho da dầu giá dưới 500k',
+                    'mình cần serum vitamin c cho da thường dưới 500k',
+                    'tìm kem mắt cho da nhạy cảm giá dưới 300k',
+                    'gợi ý mặt nạ cho da khô dưới 200k',
+                    'tìm essence cho da hỗn hợp giá khoảng 400-600k',
+                ],
+                'priority' => 90,
+                'is_active' => true,
+                'config' => [
+                    'response_template' => "Xin chào! Mình hiểu bạn đang tìm sản phẩm phù hợp.\n\n{if_has_entities}Dựa vào thông tin bạn cung cấp:\n- Loại da: {skin_types}\n- Ngân sách: {budget}\n- Vấn đề da: {concerns}\n{endif}\n\n{if_has_products}Mình gợi ý cho bạn {product_count} sản phẩm phù hợp:\n{products_list}\n\nBạn muốn xem chi tiết sản phẩm nào không? 😊{endif}\n\n{if_no_products_found}Rất tiếc, mình không tìm thấy sản phẩm nào phù hợp với ngân sách {budget} của bạn. 😔\n\nBạn có thể:\n- Tăng ngân sách lên một chút\n- Hoặc cho mình biết thêm về loại da và vấn đề da để mình tư vấn sản phẩm phù hợp hơn{endif}\n\n{if_no_products}Để mình tư vấn chính xác hơn, bạn có thể cho mình biết:\n- Loại da của bạn (dầu, khô, hỗn hợp, nhạy cảm)\n- Ngân sách bạn muốn chi (VD: 300-500k)\n- Vấn đề da bạn đang gặp (mụn, thâm, lỗ chân lông...){endif}",
+                    'tools' => ['searchProducts'],
+                    'required_entities' => [],
+                    'optional_entities' => ['skin_types', 'budget', 'product_type', 'concerns'],
+                    'follow_up_questions' => [
+                        'Bạn có thể cho mình biết loại da của bạn không?',
+                        'Ngân sách bạn muốn chi là bao nhiêu?',
+                    ],
+                    'confidence_threshold' => 0.7,
+                ],
+            ],
+            [
+                'name' => 'shipping_policy',
+                'display_name' => 'Hỏi về phí ship',
+                'description' => 'Khách hàng hỏi về phí vận chuyển',
+                'examples' => [
+                    'phí ship bao nhiêu',
+                    'phí vận chuyển',
+                    'ship bao nhiêu',
+                    'giao hàng bao nhiêu tiền',
+                    'miễn phí ship không',
+                    'phí ship',
+                    'chi phí giao hàng',
+                    'phí vận chuyển bao nhiêu',
+                    'ship free không',
+                    'có miễn phí ship không',
+                    'phí ship như thế nào',
+                    'giao hàng mất phí không',
+                ],
+                'priority' => 85,
+                'is_active' => true,
+                'config' => [
+                    'response_template' => "**Phí vận chuyển:**\n\n- Miễn phí ship cho đơn từ 500.000₫\n- Phí ship 30.000₫ cho đơn dưới 500.000₫\n- Giao hàng toàn quốc trong 2-5 ngày làm việc\n\nBạn có câu hỏi gì khác về vận chuyển không? 😊",
+                    'tools' => ['getPolicy'],
+                    'required_entities' => [],
+                    'optional_entities' => [],
+                    'follow_up_questions' => [],
+                    'confidence_threshold' => 0.7,
+                ],
+            ],
+            [
+                'name' => 'return_policy',
+                'display_name' => 'Hỏi về đổi trả',
+                'description' => 'Khách hàng hỏi về chính sách đổi trả',
+                'examples' => [
+                    'đổi trả như thế nào',
+                    'chính sách đổi trả',
+                    'có được đổi không',
+                    'đổi hàng',
+                    'trả hàng',
+                    'hoàn tiền',
+                    'bảo hành',
+                    'chính sách đổi',
+                    'chính sách trả',
+                    'đổi trả trong bao lâu',
+                    'có được hoàn tiền không',
+                    'điều kiện đổi trả',
+                ],
+                'priority' => 85,
+                'is_active' => true,
+                'config' => [
+                    'response_template' => "**Chính sách đổi trả:**\n\n- Đổi trả miễn phí trong vòng 7 ngày kể từ ngày nhận hàng\n- Sản phẩm phải còn nguyên seal, chưa sử dụng\n- Chúng tôi sẽ hoàn tiền 100% nếu sản phẩm lỗi từ nhà sản xuất\n\nBạn có câu hỏi gì khác về đổi trả không? 😊",
+                    'tools' => ['getPolicy'],
+                    'required_entities' => [],
+                    'optional_entities' => [],
+                    'follow_up_questions' => [],
+                    'confidence_threshold' => 0.7,
+                ],
+            ],
+            [
+                'name' => 'payment_policy',
+                'display_name' => 'Hỏi về thanh toán',
+                'description' => 'Khách hàng hỏi về phương thức thanh toán',
+                'examples' => [
+                    'thanh toán như thế nào',
+                    'có thể thanh toán bằng gì',
+                    'cod',
+                    'chuyển khoản',
+                    'ví điện tử',
+                    'momo',
+                    'zalopay',
+                    'phương thức thanh toán',
+                    'cách thanh toán',
+                    'thanh toán online',
+                    'thanh toán khi nhận hàng',
+                ],
+                'priority' => 85,
+                'is_active' => true,
+                'config' => [
+                    'response_template' => "**Phương thức thanh toán:**\n\n- Thanh toán khi nhận hàng (COD)\n- Chuyển khoản ngân hàng\n- Ví điện tử (MoMo, ZaloPay)\n- Thẻ tín dụng/ghi nợ\n\nTất cả giao dịch đều được bảo mật an toàn!\n\nBạn có câu hỏi gì khác về thanh toán không? 😊",
+                    'tools' => ['getPolicy'],
+                    'required_entities' => [],
+                    'optional_entities' => [],
+                    'follow_up_questions' => [],
+                    'confidence_threshold' => 0.7,
+                ],
+            ],
+            [
+                'name' => 'order_tracking',
+                'display_name' => 'Tra cứu đơn hàng',
+                'description' => 'Khách hàng muốn tra cứu đơn hàng',
+                'examples' => [
+                    'tra cứu đơn hàng',
+                    'mã đơn hàng',
+                    'đơn hàng của tôi',
+                    'kiểm tra đơn hàng',
+                    'đơn hàng',
+                    'order',
+                    'tracking',
+                    'mã đơn',
+                    'tình trạng đơn hàng',
+                    'đơn hàng đến đâu rồi',
+                ],
+                'priority' => 80,
+                'is_active' => true,
+                'config' => [
+                    'response_template' => "Để tra cứu đơn hàng, bạn có thể:\n\n1. Nhập mã đơn hàng vào ô tìm kiếm\n2. Hoặc cung cấp số điện thoại đã đặt hàng\n\nBạn có mã đơn hàng hoặc số điện thoại không? Mình sẽ giúp bạn tra cứu ngay! 😊",
+                    'tools' => ['getOrderStatus'],
+                    'required_entities' => [],
+                    'optional_entities' => [],
+                    'follow_up_questions' => [
+                        'Bạn có mã đơn hàng không?',
+                        'Bạn có thể cung cấp số điện thoại đã đặt hàng không?',
+                    ],
+                    'confidence_threshold' => 0.7,
+                ],
+            ],
+            [
+                'name' => 'product_info',
+                'display_name' => 'Thông tin sản phẩm',
+                'description' => 'Khách hàng hỏi về thông tin sản phẩm cụ thể',
+                'examples' => [
+                    'thông tin sản phẩm',
+                    'sản phẩm này như thế nào',
+                    'chi tiết sản phẩm',
+                    'review sản phẩm',
+                    'đánh giá sản phẩm',
+                    'sản phẩm có tốt không',
+                    'thành phần',
+                    'công dụng',
+                    'cách dùng',
+                    'phù hợp với loại da nào',
+                ],
+                'priority' => 75,
+                'is_active' => true,
+                'config' => [
+                    'response_template' => "Mình sẽ cung cấp thông tin chi tiết về sản phẩm cho bạn!\n\n{if_has_products}{products_list}\n\nBạn muốn biết thêm thông tin gì về sản phẩm này không? 😊{endif}\n\n{if_no_products}Bạn muốn tìm hiểu về sản phẩm nào? Hãy cho mình biết tên sản phẩm nhé!{endif}",
+                    'tools' => ['getProductInfo'],
+                    'required_entities' => [],
+                    'optional_entities' => [],
+                    'follow_up_questions' => [],
+                    'confidence_threshold' => 0.7,
+                ],
+            ],
+            [
+                'name' => 'price_inquiry',
+                'display_name' => 'Hỏi về giá',
+                'description' => 'Khách hàng hỏi về giá sản phẩm',
+                'examples' => [
+                    'giá bao nhiêu',
+                    'bao nhiêu tiền',
+                    'giá',
+                    'cost',
+                    'price',
+                    'giá sản phẩm',
+                    'sản phẩm này giá bao nhiêu',
+                    'có giảm giá không',
+                    'khuyến mãi',
+                    'sale',
+                ],
+                'priority' => 70,
+                'is_active' => true,
+                'config' => [
+                    'response_template' => "Mình sẽ kiểm tra giá sản phẩm cho bạn!\n\n{if_has_products}{products_list}\n\nBạn có muốn đặt hàng sản phẩm này không? 😊{endif}\n\n{if_no_products}Bạn muốn biết giá của sản phẩm nào? Hãy cho mình biết tên sản phẩm nhé!{endif}",
+                    'tools' => ['getProductInfo', 'searchProducts'],
+                    'required_entities' => [],
+                    'optional_entities' => [],
+                    'follow_up_questions' => [],
+                    'confidence_threshold' => 0.7,
+                ],
+            ],
+        ];
+
+        foreach ($intents as $intentData) {
+            BotIntent::updateOrCreate(
+                ['name' => $intentData['name']],
+                $intentData
+            );
+        }
+
+        $this->command->info('✅ Đã seed ' . count($intents) . ' intents với examples và response templates đầy đủ!');
+    }
+}
+
