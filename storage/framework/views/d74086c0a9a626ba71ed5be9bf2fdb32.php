@@ -171,7 +171,8 @@
 
                 
                 <template x-for="m in messages" :key="m.id">
-                    <div :class="m.role==='user' ? 'flex justify-end' : 'flex justify-start'">
+                    <div :class="m.role==='user' ? 'flex justify-end' : 'flex justify-start'"
+                         :data-msg-id="m.id">
                         <div class="max-w-[85%]">
                             
                             <div x-show="m.role==='user'"
@@ -251,6 +252,8 @@
                                         <div class="relative w-full h-32 bg-gradient-to-br from-rose-50 via-pink-50 to-rose-50 overflow-hidden">
                                             <img :src="p.image || '/images/placeholder.png'"
                                                 x-on:error="$event.target.src='/images/placeholder.png'"
+                                                loading="lazy"
+                                                decoding="async"
                                                 class="w-full h-full object-contain p-2.5 group-hover:scale-110 transition-transform duration-300"
                                                 :alt="p.name">
 
@@ -296,9 +299,9 @@
                                     </svg>
                                 </div>
                                 <div class="flex gap-1">
-                                    <span class="w-2 h-2 rounded-full bg-rose-400 animate-bounce" style="animation-delay: 0s"></span>
-                                    <span class="w-2 h-2 rounded-full bg-rose-400 animate-bounce" style="animation-delay: 0.15s"></span>
-                                    <span class="w-2 h-2 rounded-full bg-rose-400 animate-bounce" style="animation-delay: 0.3s"></span>
+                                    <span class="typing-dot w-2 h-2 rounded-full bg-rose-400"></span>
+                                    <span class="typing-dot w-2 h-2 rounded-full bg-rose-400"></span>
+                                    <span class="typing-dot w-2 h-2 rounded-full bg-rose-400"></span>
                                 </div>
                             </div>
                         </div>
@@ -791,5 +794,127 @@
             }
         }
     }
+
+    // GSAP Animations - Modern 2025 animations
+    (function() {
+        if (typeof gsap === 'undefined') return;
+
+        // Initialize animations when widget is ready
+        document.addEventListener('DOMContentLoaded', () => {
+            // Watch for new messages and animate them
+            const observer = new MutationObserver((mutations) => {
+                mutations.forEach((mutation) => {
+                    mutation.addedNodes.forEach((node) => {
+                        if (node.nodeType === 1 && node.hasAttribute && node.hasAttribute('data-msg-id')) {
+                            const msgId = node.getAttribute('data-msg-id');
+                            gsap.fromTo(node,
+                                { opacity: 0, y: 20, scale: 0.9 },
+                                { 
+                                    opacity: 1, 
+                                    y: 0, 
+                                    scale: 1, 
+                                    duration: 0.3, 
+                                    ease: "back.out(1.7)" 
+                                }
+                            );
+                        }
+                    });
+                });
+            });
+
+            // Observe bot scroll container
+            const botScroll = document.getElementById('botScroll');
+            if (botScroll) {
+                observer.observe(botScroll, { childList: true, subtree: true });
+            }
+
+            // Product cards hover animation
+            const initProductCards = () => {
+                const cards = document.querySelectorAll('.js-card:not([data-gsap-initialized])');
+                cards.forEach(card => {
+                    card.setAttribute('data-gsap-initialized', 'true');
+                    
+                    card.addEventListener('mouseenter', () => {
+                        gsap.to(card, { 
+                            scale: 1.02, 
+                            duration: 0.2, 
+                            ease: "power2.out" 
+                        });
+                    });
+                    
+                    card.addEventListener('mouseleave', () => {
+                        gsap.to(card, { 
+                            scale: 1, 
+                            duration: 0.2, 
+                            ease: "power2.out" 
+                        });
+                    });
+                });
+            };
+
+            // Re-init product cards when new products are added
+            const productObserver = new MutationObserver(() => {
+                initProductCards();
+            });
+
+            if (botScroll) {
+                productObserver.observe(botScroll, { childList: true, subtree: true });
+                initProductCards();
+            }
+
+            // Typing indicator animation - Watch for typing state changes
+            const initTypingAnimation = () => {
+                const typingDots = document.querySelectorAll('.typing-dot:not(.gsap-animated)');
+                if (typingDots.length) {
+                    typingDots.forEach(dot => dot.classList.add('gsap-animated'));
+                    gsap.to(typingDots, {
+                        y: -8,
+                        duration: 0.4,
+                        stagger: 0.1,
+                        repeat: -1,
+                        yoyo: true,
+                        ease: "power2.inOut"
+                    });
+                }
+            };
+            
+            // Watch for typing indicator appearance
+            const typingObserver = new MutationObserver(() => {
+                initTypingAnimation();
+            });
+            
+            if (botScroll) {
+                typingObserver.observe(botScroll, { childList: true, subtree: true });
+                initTypingAnimation();
+            }
+        });
+
+        // Panel open/close animation - Better integration with Alpine.js
+        // Wait for Alpine to be ready
+        if (typeof Alpine !== 'undefined') {
+            document.addEventListener('alpine:init', () => {
+                // Use Alpine's $watch instead of MutationObserver for better compatibility
+                setTimeout(() => {
+                    const widget = document.querySelector('[x-data*="cosmeBotWidget"]');
+                    if (widget && widget._x_dataStack) {
+                        const widgetData = widget._x_dataStack[0];
+                        if (widgetData && typeof widgetData.$watch === 'function') {
+                            widgetData.$watch('open', (isOpen) => {
+                                if (isOpen) {
+                                    const panel = widget.querySelector('[x-show="open"]');
+                                    if (panel) {
+                                        gsap.fromTo(panel,
+                                            { opacity: 0, scale: 0.95, y: 10 },
+                                            { opacity: 1, scale: 1, y: 0, duration: 0.3, ease: "power2.out" }
+                                        );
+                                    }
+                                }
+                            });
+                        }
+                    }
+                }, 100);
+            });
+        }
+    })();
 </script>
 <?php /**PATH C:\xampp\htdocs\cosmetics-shop\resources\views/components/bot-widget.blade.php ENDPATH**/ ?>

@@ -111,9 +111,22 @@
                 </ul>
             </div>
             <div>
-                <h4 class="font-semibold mb-2">Liên hệ</h4>
-                <p class="text-ink/80">Hotline: 1900 1234</p>
-                <p class="text-ink/80">Email: support@cosme.house</p>
+                <h4 class="font-semibold mb-2 flex items-center gap-2">
+                    <div class="w-7 h-7 rounded-full border-2 border-rose-500/30 bg-gradient-to-br from-rose-50 to-pink-50 flex items-center justify-center">
+                        <i class="fa-solid fa-headset text-rose-600 text-xs"></i>
+                    </div>
+                    <span>Thông tin liên hệ</span>
+                </h4>
+                <div class="space-y-1.5 text-ink/80">
+                    <p class="flex items-center gap-2 text-xs sm:text-sm">
+                        <i class="fa-solid fa-phone text-rose-600 text-xs"></i>
+                        <span>Hotline: <a href="tel:19001234" class="hover:text-brand-600 font-medium">1900 1234</a> (8:00 - 22:00)</span>
+                    </p>
+                    <p class="flex items-center gap-2 text-xs sm:text-sm">
+                        <i class="fa-solid fa-envelope text-rose-600 text-xs"></i>
+                        <span>Email: <a href="mailto:support@cosme.house" class="hover:text-brand-600">support@cosme.house</a></span>
+                    </p>
+                </div>
             </div>
         </div>
         <div class="border-t border-rose-100 py-3 text-center text-xs text-ink/60">
